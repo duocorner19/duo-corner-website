@@ -5,10 +5,11 @@ import type { Product } from "@/lib/data";
 import { products as localProducts } from "@/lib/data";
 import Loader from "@/components/Loader";
 import Image from "next/image";
+import Link from "next/link";
 
 type ProductGridProps = {
-  onDetails: (product: Product) => void;
-  onOrder: (product: Product) => void;
+  onDetails?: (product: Product) => void;
+  onOrder?: (product: Product) => void;
   searchQuery?: string;
   selectedCategory?: string;
 };
@@ -24,7 +25,12 @@ export default function ProductGrid({
   const [isSearching, setIsSearching] = useState(false);
   const [, startTransition] = useTransition();
 
-  // প্রথমবার পেজ লোড হওয়ার ডেটা ফেচিং
+  const handleSaveScrollPosition = () => {
+    if (typeof window !== "undefined") {
+      sessionStorage.setItem("home_scroll_pos", window.scrollY.toString());
+    }
+  };
+
   useEffect(() => {
     let isMounted = true;
     const fetchProducts = async () => {
@@ -49,7 +55,6 @@ export default function ProductGrid({
     };
   }, []);
 
-  // সার্চ করার সময় ক্যাস্কেডিং রেন্ডার এড়াতে useTransition ব্যবহার করা হয়েছে
   useEffect(() => {
     let timer: NodeJS.Timeout;
     if (searchQuery.trim() !== "") {
@@ -71,7 +76,6 @@ export default function ProductGrid({
     };
   }, [searchQuery]);
 
-  // সার্চ এবং ক্যাটাগরি ফিল্টারিং লজিক
   const filteredProducts = products.filter((product) => {
     const pAny = product as Record<string, unknown>;
     const prodName = String(
@@ -109,7 +113,6 @@ export default function ProductGrid({
         </span>
       </div>
 
-      {/* প্রোডাক্ট গ্রিড ডিসপ্লে */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
         {filteredProducts.map((product, index) => {
           const pAny = product as Record<string, unknown>;
@@ -120,6 +123,14 @@ export default function ProductGrid({
               pAny["Product Name"] ||
               "Product",
           );
+
+          const rawSlug = String(
+            pAny.slug ||
+              product.slug ||
+              prodId ||
+              prodName.toLowerCase().replace(/\s+/g, "-"),
+          );
+          const productUrl = `/product/${encodeURIComponent(rawSlug)}`;
 
           const regularPrice = Number(
             pAny.regularPrice || pAny["Regular Price"] || 999,
@@ -169,9 +180,13 @@ export default function ProductGrid({
               key={prodId}
               className="bg-white rounded-2xl shadow-sm border border-rose-100 overflow-hidden flex flex-col group hover:shadow-md transition-all duration-300"
             >
-              <div
-                onClick={() => onDetails(product)}
-                className="aspect-square bg-gray-100 relative overflow-hidden cursor-pointer"
+              <Link
+                href={productUrl}
+                onClick={() => {
+                  handleSaveScrollPosition();
+                  if (onDetails) onDetails(product);
+                }}
+                className="aspect-square bg-gray-100 relative overflow-hidden cursor-pointer block"
               >
                 {discountPercent > 0 && (
                   <span className="absolute top-2.5 left-2.5 z-10 bg-gradient-to-r from-rose-600 to-red-600 text-white text-[11px] font-black px-2.5 py-1 rounded-lg shadow-lg tracking-wider animate-pulse">
@@ -185,7 +200,7 @@ export default function ProductGrid({
                   sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
                   className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
                 />
-              </div>
+              </Link>
 
               <div className="p-3.5 flex flex-col flex-1 justify-between">
                 <div>
@@ -193,12 +208,18 @@ export default function ProductGrid({
                     {prodCategory}
                   </span>
 
-                  <h3
-                    onClick={() => onDetails(product)}
-                    className="text-xs sm:text-sm font-bold text-gray-800 mt-1.5 line-clamp-2 cursor-pointer hover:text-rose-600 transition"
+                  <Link
+                    href={productUrl}
+                    onClick={() => {
+                      handleSaveScrollPosition();
+                      if (onDetails) onDetails(product);
+                    }}
+                    className="block"
                   >
-                    {prodName}
-                  </h3>
+                    <h3 className="text-xs sm:text-sm font-bold text-gray-800 mt-1.5 line-clamp-2 cursor-pointer hover:text-rose-600 transition">
+                      {prodName}
+                    </h3>
+                  </Link>
                 </div>
 
                 <div className="mt-3">
@@ -224,18 +245,27 @@ export default function ProductGrid({
                   </div>
 
                   <div className="grid grid-cols-2 gap-1.5">
-                    <button
-                      onClick={() => onDetails(product)}
-                      className="bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-bold py-2 rounded-xl transition cursor-pointer"
+                    <Link
+                      href={productUrl}
+                      onClick={() => {
+                        handleSaveScrollPosition();
+                        if (onDetails) onDetails(product);
+                      }}
+                      className="bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-bold py-2 rounded-xl transition cursor-pointer text-center flex items-center justify-center"
                     >
                       বিস্তারিত
-                    </button>
-                    <button
-                      onClick={() => onOrder(product)}
-                      className="bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold py-2 rounded-xl transition cursor-pointer shadow-sm"
+                    </Link>
+                    <Link
+                      href={productUrl}
+                      onClick={() => {
+                        handleSaveScrollPosition();
+                        if (onOrder) onOrder(product);
+                        else if (onDetails) onDetails(product);
+                      }}
+                      className="bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold py-2 rounded-xl transition cursor-pointer shadow-sm text-center flex items-center justify-center"
                     >
                       অর্ডার
-                    </button>
+                    </Link>
                   </div>
                 </div>
               </div>
@@ -244,7 +274,6 @@ export default function ProductGrid({
         })}
       </div>
 
-      {/* যদি সার্চ বা ক্যাটাগরিতে কোনো পণ্য না পাওয়া যায় */}
       {filteredProducts.length === 0 && (
         <div className="min-h-[60vh] flex flex-col items-center justify-center text-center px-4 py-16 space-y-6">
           <div className="relative w-full max-w-sm aspect-video rounded-3xl overflow-hidden bg-gradient-to-br from-slate-950 via-slate-900 to-black border border-amber-500/40 shadow-2xl flex flex-col items-center justify-center p-6">

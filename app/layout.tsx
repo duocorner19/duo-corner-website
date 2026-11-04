@@ -25,6 +25,11 @@ export const viewport: Viewport = {
 };
 
 const FB_PIXEL_ID = process.env.NEXT_PUBLIC_FB_PIXEL_ID;
+const FACEBOOK_DOMAIN_VERIFICATION =
+  process.env.NEXT_PUBLIC_FACEBOOK_DOMAIN_VERIFICATION;
+const GOOGLE_SITE_VERIFICATION =
+  process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION;
+const GA_MEASUREMENT_ID = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID;
 
 export default function RootLayout({
   children,
@@ -33,8 +38,24 @@ export default function RootLayout({
 }>) {
   return (
     <ClerkProvider>
-      <html lang="en">
+      <html lang="bn">
         <head>
+          {/* Facebook Domain Verification */}
+          {FACEBOOK_DOMAIN_VERIFICATION && (
+            <meta
+              name="facebook-domain-verification"
+              content={FACEBOOK_DOMAIN_VERIFICATION}
+            />
+          )}
+
+          {/* Google Search Console Verification */}
+          {GOOGLE_SITE_VERIFICATION && (
+            <meta
+              name="google-site-verification"
+              content={GOOGLE_SITE_VERIFICATION}
+            />
+          )}
+
           {/* Facebook Pixel Code */}
           {FB_PIXEL_ID && (
             <Script
@@ -56,6 +77,61 @@ export default function RootLayout({
               }}
             />
           )}
+
+          {/* Google Analytics 4 (GA4) Integration (যদি এনভায়রনমেন্ট ভ্যারিয়েবলে থাকে) */}
+          {GA_MEASUREMENT_ID && (
+            <>
+              <Script
+                strategy="afterInteractive"
+                src={`https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`}
+              />
+              <Script
+                id="google-analytics"
+                strategy="afterInteractive"
+                dangerouslySetInnerHTML={{
+                  __html: `
+                    window.dataLayer = window.dataLayer || [];
+                    function gtag(){dataLayer.push(arguments);}
+                    gtag('js', new Date());
+                    gtag('config', '${GA_MEASUREMENT_ID}', {
+                      page_path: window.location.pathname,
+                    });
+                  `,
+                }}
+              />
+            </>
+          )}
+
+          {/* Marketing Attribution Capture (UTM, fbclid, gclid সংরক্ষণ করার স্ক্রিপ্ট) */}
+          <Script
+            id="marketing-attribution"
+            strategy="afterInteractive"
+            dangerouslySetInnerHTML={{
+              __html: `
+                (function() {
+                  try {
+                    const params = new URLSearchParams(window.location.search);
+                    const utmKeys = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term', 'fbclid', 'gclid'];
+                    let attribution = JSON.parse(sessionStorage.getItem('duo_attribution') || '{}');
+                    
+                    let hasNew = false;
+                    utmKeys.forEach(key => {
+                      if (params.has(key)) {
+                        attribution[key] = params.get(key);
+                        hasNew = true;
+                      }
+                    });
+                    
+                    if (hasNew) {
+                      attribution['landing_page'] = window.location.pathname;
+                      attribution['timestamp'] = new Date().toISOString();
+                      sessionStorage.setItem('duo_attribution', JSON.stringify(attribution));
+                    }
+                  } catch(e) {}
+                })();
+              `,
+            }}
+          />
         </head>
         <body className={`${hindSiliguri.variable} antialiased font-sans`}>
           {FB_PIXEL_ID && (

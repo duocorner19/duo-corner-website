@@ -29,7 +29,9 @@
     "**/*.tsx",
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts",
-    "next.config.mjs"
+    "next.config.mjs",
+    "components/admin/CustomerRiskBadge.jsx",
+    "components/admin/CustomerRiskBadge.jsx"
   ],
   "exclude": ["node_modules"]
 }

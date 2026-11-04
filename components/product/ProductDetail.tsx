@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import type { Product } from "@/lib/data";
 import { divisionData } from "@/lib/data";
-import { trackEvent } from "@/lib/tracker"; // ট্র্যাকার ইমপোর্ট
+import { trackEvent } from "@/lib/tracker";
 import ProductGallery from "./ProductGallery";
 import ProductSpecs from "./ProductSpecs";
 import CheckoutForm from "./CheckoutForm";
@@ -108,12 +108,13 @@ export default function ProductDetail({ product, onBack }: ProductDetailProps) {
   const [paymentMethod, setPaymentMethod] = useState("cod");
   const [coupon, setCoupon] = useState("");
   const [specialNote, setSpecialNote] = useState("");
-  const [agreed, setAgreed] = useState(true);
+
+  // অটোমেটিক টিক বন্ধ রাখার জন্য নিশ্চিতভাবে false দেওয়া হয়েছে
+  const [agreed, setAgreed] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [orderSuccess, setOrderSuccess] = useState(false);
 
-  // ১. প্রোডাক্ট পেজ লোড হলে ViewContent ট্র্যাক হবে
   useEffect(() => {
     trackEvent("ViewContent", {
       customData: {
@@ -170,12 +171,21 @@ export default function ProductDetail({ product, onBack }: ProductDetailProps) {
     }
 
     if (!agreed) {
-      alert("দয়া করে শর্তাবলীতে সম্মতি দিন!");
+      alert("দয়া করে শর্তাবলী ও বিশেষ বার্তাটি পড়ে সম্মতি দিন!");
       return;
     }
 
     setLoading(true);
     try {
+      let attributionData: Record<string, string> = {};
+      if (typeof window !== "undefined") {
+        try {
+          attributionData = JSON.parse(
+            sessionStorage.getItem("duo_attribution") || "{}",
+          );
+        } catch {}
+      }
+
       const res = await fetch("/api/save-order", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -188,10 +198,14 @@ export default function ProductDetail({ product, onBack }: ProductDetailProps) {
           address: address,
           note: `${productName} (Qty: ${quantity}), Note: ${specialNote}, Payment: ${paymentMethod}, Delivery: ${deliveryCharge} BDT`,
           amount: total,
+          utmSource: attributionData.utm_source || "Direct",
+          utmCampaign: attributionData.utm_campaign || "",
+          utmMedium: attributionData.utm_medium || "",
+          fbclid: attributionData.fbclid || "",
+          gclid: attributionData.gclid || "",
         }),
       });
 
-      // ২. অর্ডার সাবমিট হলে 'PlaceOrder' বা 'Lead' ইভেন্ট মেটায় যাবে (Purchase ফায়ার হবে না)
       trackEvent("PlaceOrder", {
         userData: {
           phone: cleanPhone,

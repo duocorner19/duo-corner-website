@@ -12,6 +12,7 @@ import {
   Filter,
   AlertCircle,
 } from "lucide-react";
+import CustomerRiskBadge from "@/components/admin/CustomerRiskBadge"; // নতুন ইমপোর্ট
 
 type Order = {
   orderId?: string;
@@ -138,7 +139,7 @@ export default function AdminOrdersPage() {
             Courier Processing Hub
           </h2>
           <p className="text-xs text-slate-400 mt-0.5">
-            গুগল শিট থেকে রিয়েল-টাইম সিঙ্ক হওয়া সমস্ত কাস্টমার অর্ডার এবং
+            গুগল শিট থেকে রিয়েল-টাইম সিঙ্ক হওয়া সমস্ত কাস্টমার অর্ডার এবং
             Steadfast কুরিয়ার বুকিং ম্যানেজমেন্ট।
           </p>
         </div>
@@ -170,25 +171,41 @@ export default function AdminOrdersPage() {
         <div className="flex flex-wrap gap-2 w-full sm:w-auto">
           <button
             onClick={() => setStatusFilter("all")}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${statusFilter === "all" ? "bg-rose-600 text-white shadow-md" : "bg-slate-950 text-slate-300 hover:bg-slate-800"}`}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
+              statusFilter === "all"
+                ? "bg-rose-600 text-white shadow-md"
+                : "bg-slate-950 text-slate-300 hover:bg-slate-800"
+            }`}
           >
             সকল অর্ডার ({orders.length})
           </button>
           <button
             onClick={() => setStatusFilter("pending")}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${statusFilter === "pending" ? "bg-rose-600 text-white shadow-md" : "bg-slate-950 text-slate-300 hover:bg-slate-800"}`}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
+              statusFilter === "pending"
+                ? "bg-rose-600 text-white shadow-md"
+                : "bg-slate-950 text-slate-300 hover:bg-slate-800"
+            }`}
           >
             Pending
           </button>
           <button
             onClick={() => setStatusFilter("booked")}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${statusFilter === "booked" ? "bg-rose-600 text-white shadow-md" : "bg-slate-950 text-slate-300 hover:bg-slate-800"}`}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
+              statusFilter === "booked"
+                ? "bg-rose-600 text-white shadow-md"
+                : "bg-slate-950 text-slate-300 hover:bg-slate-800"
+            }`}
           >
             Booked / Shipped
           </button>
           <button
             onClick={() => setStatusFilter("delivered")}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${statusFilter === "delivered" ? "bg-rose-600 text-white shadow-md" : "bg-slate-950 text-slate-300 hover:bg-slate-800"}`}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
+              statusFilter === "delivered"
+                ? "bg-rose-600 text-white shadow-md"
+                : "bg-slate-950 text-slate-300 hover:bg-slate-800"
+            }`}
           >
             Delivered
           </button>
@@ -216,7 +233,7 @@ export default function AdminOrdersPage() {
                 <tr>
                   <td colSpan={8} className="text-center py-12 text-slate-500">
                     <div className="w-8 h-8 mx-auto mb-2 border-2 border-rose-500/20 border-t-rose-500 rounded-full animate-spin"></div>
-                    ორ্ডার ডাটা লোড হচ্ছে...
+                    অর্ডার ডাটা লোড হচ্ছে...
                   </td>
                 </tr>
               ) : filteredOrders.length === 0 ? (
@@ -247,9 +264,15 @@ export default function AdminOrdersPage() {
                       </td>
                       <td className="p-4 font-bold text-white">
                         {order.name || "Unknown"} <br />
-                        <span className="text-[11px] text-cyan-400 font-mono font-normal">
-                          {order.phone || "No Number"}
-                        </span>
+                        <div className="flex items-center flex-wrap gap-1 mt-0.5">
+                          <span className="text-[11px] text-cyan-400 font-mono font-normal">
+                            {order.phone || "No Number"}
+                          </span>
+                          {/* Steadfast ফ্রড ও সাকসেস রেট ব্যাজ */}
+                          {order.phone && (
+                            <CustomerRiskBadge phone={order.phone} />
+                          )}
+                        </div>
                       </td>
                       <td className="p-4 text-slate-300 max-w-xs truncate">
                         {order.address || "N/A"}

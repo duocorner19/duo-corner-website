@@ -1,70 +1,67 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Header from "@/components/landing/Header";
 import Hero from "@/components/landing/Hero";
 import TrustStrip from "@/components/landing/TrustStrip";
 import Footer from "@/components/landing/Footer";
 import ProductGrid from "@/components/landing/ProductGrid";
-import ProductDetail from "@/components/product/ProductDetail";
-import type { Product } from "@/lib/data";
+import CustomerReviews from "@/components/reviews/CustomerReviews";
 import { whatsappChatLink } from "@/lib/data";
 
 export default function Home() {
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
 
-  const handleDetails = (product: Product) => {
-    setSelectedProduct(product);
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
-
   const handleBackToHome = () => {
-    setSelectedProduct(null);
     setSearchQuery("");
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
+  // কাস্টমার ব্যাক বাটন চেপে প্রোডাক্ট থেকে হোমপেজে আসলে ঠিক পূর্বের স্ক্রোল পজিশনে স্ক্রিন নামিয়ে দেওয়া
+  useEffect(() => {
+    const savedScroll = sessionStorage.getItem("home_scroll_pos");
+    if (savedScroll) {
+      setTimeout(() => {
+        window.scrollTo({
+          top: parseInt(savedScroll, 10),
+          behavior: "smooth",
+        });
+        sessionStorage.removeItem("home_scroll_pos");
+      }, 100);
+    }
+  }, []);
+
   return (
     <main className="min-h-screen bg-[#0a0a0a] text-white relative selection:bg-[#D4AF37] selection:text-black font-sans">
-      {/* ১. স্মার্ট ও প্রিমিয়াম হেডার (হোম এবং ক্যাটাগরি ফিল্টার সহ) */}
+      {/* ১. স্মার্ট ও প্রিমিয়াম হেডার (হোম এবং ক্যাটাগরি ফিল্টার সহ) */}
       <Header
         onHome={handleBackToHome}
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
         onCategorySelect={(cat) => {
           setSearchQuery(cat);
-          setSelectedProduct(null);
         }}
       />
 
       {/* ২. মূল কন্টেন্ট ও প্রোডাক্ট সেকশন */}
       <div id="products-section">
-        {selectedProduct ? (
-          <div className="py-6">
-            <ProductDetail
-              product={selectedProduct}
-              onBack={handleBackToHome}
-            />
-          </div>
-        ) : (
-          <div>
-            {/* ৩:১ ওয়াইড সিনেম্যাটিক হিরো ব্যানার */}
-            <Hero onHome={handleBackToHome} />
+        <div>
+          {/* ৩:১ ওয়াইড সিনেম্যাটিক হিরো ব্যানার */}
+          <Hero onHome={handleBackToHome} />
 
-            {/* প্রোডাক্ট গ্রিড, সার্চ ও সরি প্লেকার্ড অ্যানিমেশন সহ */}
-            <ProductGrid
-              onDetails={handleDetails}
-              onOrder={(product) => handleDetails(product)}
-              searchQuery={searchQuery}
-            />
-          </div>
-        )}
+          {/* হিরো ব্যানারের ঠিক নিচে রিয়েল-টাইম রেটিং ও রিভিউ সেকশন */}
+          <section className="w-full bg-[#101010]/95 border-b border-[#D4AF37]/15 my-2">
+            <CustomerReviews />
+          </section>
+
+          {/* প্রোডাক্ট গ্রিড, সার্চ ও সরি প্লেকার্ড অ্যানিমেশন সহ */}
+          <ProductGrid searchQuery={searchQuery} />
+        </div>
       </div>
 
       {/* ৩. ট্রাস্ট স্ট্রিপ */}
       <TrustStrip />
 
-      {/* ৪. প্রিমিয়াম ব্ল্যাক অ্যান্ড গোল্ড ফুটার */}
+      {/* ৪. প্রিমিয়াম ব্ল্যাক অ্যান্ড গোল্ড ফুটার */}
       <Footer />
 
       {/* হোয়াটসঅ্যাপ ফ্লোটিং আইকন ও অরিজিনাল ডেকোরেশন */}

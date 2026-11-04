@@ -29,7 +29,7 @@ import {
 // আপনার অনুমোদিত ১০টি অ্যাডমিন ইমেইলের লিস্ট (প্রথম ইমেইলটি আপনার দেওয়া)
 const ADMIN_EMAILS = [
   "mdimranatick@gmail.com",
-  "admin2@gmail.com",
+  "copyvai1998@gmail.com",
   "admin3@gmail.com",
   "admin4@gmail.com",
   "admin5@gmail.com",

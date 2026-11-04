@@ -1,4 +1,7 @@
-'use client';
+"use client";
+
+import React from "react";
+import { Sparkles, Video, CheckCircle2 } from "lucide-react";
 
 type ProductSpecsProps = {
   productAttributes: { label: string; value: string }[];
@@ -11,43 +14,62 @@ export default function ProductSpecs({
   productAttributes,
   productName,
   productDescription,
-  productVideo
+  productVideo,
 }: ProductSpecsProps) {
   return (
-    <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-200 mb-6 space-y-4 font-sans">
-      <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-        <h3 className="text-xs font-black text-gray-700 uppercase tracking-wider flex items-center gap-1.5">
-          <span className="text-orange-500">⚡</span> PRODUCT SPECIFICATIONS
+    <div className="space-y-4 my-6 font-sans">
+      {/* প্রোডাক্ট স্পেসিফিকেশন কার্ড */}
+      <div className="bg-[#141414] border border-[#D4AF37]/25 rounded-2xl p-4 sm:p-5 shadow-xl text-gray-200">
+        <h3 className="text-xs font-black text-[#D4AF37] uppercase tracking-wider mb-3 flex items-center gap-1.5">
+          <Sparkles size={14} className="text-[#D4AF37]" /> প্রোডাক্টের বিশেষ
+          বিবরণ
         </h3>
-        <span className="text-[10px] font-bold text-rose-500 bg-rose-50 px-2 py-0.5 rounded">100% ORIGINAL</span>
-      </div>
 
-      <div className="divide-y divide-gray-50 text-xs">
-        {productAttributes.map((attr, idx) => (
-          <div key={idx} className="py-2.5 grid grid-cols-3 gap-4 items-center">
-            <span className="font-medium text-gray-500">{attr.label}</span>
-            <span className="col-span-2 font-semibold text-gray-800">{attr.value}</span>
-          </div>
-        ))}
-      </div>
-
-      <div className="pt-2">
-        <h4 className="text-xs font-bold text-gray-800 mb-1">{productName}</h4>
-        <p className="text-[11px] text-gray-600 leading-relaxed bg-gray-50 p-3 rounded-xl border border-gray-100">
+        <p className="text-xs sm:text-sm text-gray-300 leading-relaxed font-normal mb-4">
           {productDescription}
         </p>
-      </div>
 
-      <div>
-        <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-2">
-          <span className="w-1.5 h-4 bg-[#f8931f] rounded-full"></span> Product Video Review (ভিডিও রিভিউ)
-        </h3>
-        <div className="rounded-xl overflow-hidden bg-black border border-gray-200 aspect-video flex items-center justify-center">
-          <video src={productVideo} controls autoPlay muted loop className="w-full h-full object-cover" key={productVideo}>
-            আপনার ব্রাউজার ভিডিও ট্যাগ সাপোর্ট করে না।
-          </video>
+        {/* অ্যাট্রিবিউট গ্রিড */}
+        <div className="grid grid-cols-2 gap-2 text-xs">
+          {productAttributes.map((attr, idx) => (
+            <div
+              key={idx}
+              className="bg-[#1c1c1c] border border-gray-800 rounded-xl p-2.5 flex items-center justify-between"
+            >
+              <span className="text-gray-400 font-medium text-[11px]">
+                {attr.label}
+              </span>
+              <span className="text-white font-bold text-[11px] truncate">
+                {attr.value}
+              </span>
+            </div>
+          ))}
         </div>
       </div>
+
+      {/* প্রোডাক্ট ভিডিও রিভিউ সেকশন (ডার্ক প্রিমিয়াম ফ্রেম) */}
+      {productVideo && (
+        <div className="bg-[#141414] border border-[#D4AF37]/25 rounded-2xl p-4 sm:p-5 shadow-xl">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-xs font-black text-[#D4AF37] uppercase tracking-wider flex items-center gap-1.5">
+              <Video size={15} className="text-[#D4AF37]" /> প্রোডাক্ট লাইভ
+              ভিডিও রিভিউ
+            </h3>
+            <span className="text-[10px] bg-emerald-950 text-emerald-400 border border-emerald-500/30 px-2.5 py-0.5 rounded-full font-bold flex items-center gap-1">
+              <CheckCircle2 size={11} /> ১০০% অরিজিনাল ভিডিও
+            </span>
+          </div>
+
+          <div className="relative aspect-video rounded-xl overflow-hidden bg-black border border-gray-800 shadow-2xl">
+            <video
+              src={productVideo}
+              controls
+              playsInline
+              className="w-full h-full object-contain"
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
