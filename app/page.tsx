@@ -1,4 +1,5 @@
 "use client";
+
 import { useState, useEffect } from "react";
 import Header from "@/components/landing/Header";
 import Hero from "@/components/landing/Hero";
@@ -10,13 +11,40 @@ import { whatsappChatLink } from "@/lib/data";
 
 export default function Home() {
   const [searchQuery, setSearchQuery] = useState("");
+  // ক্যাটাগরি স্টেট (টাইপ এরর সমাধানের জন্য স্টেট ডিক্লেয়ার করা হলো)
+  const [categories, setCategories] = useState<string[]>([
+    "ব্রেসলেট (Bracelet)",
+    "নেকলেস (Necklace)",
+    "স্মার্ট ওয়াচ (Smart Watch)",
+    "গিফট বক্স (Gift Box)",
+  ]);
 
   const handleBackToHome = () => {
     setSearchQuery("");
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  // কাস্টমার ব্যাক বাটন চেপে প্রোডাক্ট থেকে হোমপেজে আসলে ঠিক পূর্বের স্ক্রোল পজিশনে স্ক্রিন নামিয়ে দেওয়া
+  // ১. গুগল শিট API থেকে লাইভ ক্যাটাগরি ফেচ করা
+  useEffect(() => {
+    async function loadCategories() {
+      try {
+        const res = await fetch("/api/categories");
+        const data = await res.json();
+        if (
+          data.success &&
+          Array.isArray(data.categories) &&
+          data.categories.length > 0
+        ) {
+          setCategories(data.categories);
+        }
+      } catch (err) {
+        console.warn("Categories fetch error, using default fallback.");
+      }
+    }
+    loadCategories();
+  }, []);
+
+  // ২. কাস্টমার ব্যাক বাটন চেপে প্রোডাক্ট থেকে হোমপেজে আসলে ঠিক পূর্বের স্ক্রোল পজিশনে স্ক্রিন নামিয়ে দেওয়া
   useEffect(() => {
     const savedScroll = sessionStorage.getItem("home_scroll_pos");
     if (savedScroll) {
@@ -32,7 +60,7 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-[#0a0a0a] text-white relative selection:bg-[#D4AF37] selection:text-black font-sans">
-      {/* ১. স্মার্ট ও প্রিমিয়াম হেডার (হোম এবং ক্যাটাগরি ফিল্টার সহ) */}
+      {/* ১. স্মার্ট ও প্রিমিয়াম হেডার (হোম এবং ডাইনামিক ক্যাটাগরি ফিল্টার সহ) */}
       <Header
         onHome={handleBackToHome}
         searchQuery={searchQuery}
@@ -53,7 +81,7 @@ export default function Home() {
             <CustomerReviews />
           </section>
 
-          {/* প্রোডাক্ট গ্রিড, সার্চ ও সরি প্লেকার্ড অ্যানিমেশন সহ */}
+          {/* প্রোডাক্ট গ্রিড, সার্চ ও ফিল্টারিং সহ */}
           <ProductGrid searchQuery={searchQuery} />
         </div>
       </div>
@@ -64,7 +92,7 @@ export default function Home() {
       {/* ৪. প্রিমিয়াম ব্ল্যাক অ্যান্ড গোল্ড ফুটার */}
       <Footer />
 
-      {/* হোয়াটসঅ্যাপ ফ্লোটিং আইকন ও অরিজিনাল ডেকোরেশন */}
+      {/* হোয়াটসঅ্যাপ ফ্লোটিং আইকন */}
       <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-3">
         <a
           href={whatsappChatLink}

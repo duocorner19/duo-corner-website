@@ -12,6 +12,15 @@ export default function SingleProductPage() {
   const [product, setProduct] = useState<Product | null>(null);
   const [notFound, setNotFound] = useState(false);
 
+  // কাস্টমার ব্যাক বাটন বা "হোমপেজে ফিরে যান" চাপলে ধাপে ধাপে পেছনে ফেরা
+  const handleBackStep = () => {
+    if (typeof window !== "undefined" && window.history.length > 1) {
+      router.back();
+    } else {
+      router.push("/");
+    }
+  };
+
   useEffect(() => {
     let isMounted = true;
 
@@ -20,7 +29,6 @@ export default function SingleProductPage() {
 
       const decodedSlug = decodeURIComponent(slug).toLowerCase().trim();
 
-      // ১. প্রথমে লোকাল ডেটায় খোঁজা
       const checkMatch = (p: any, index?: number) => {
         const pId = String(p.id || (index !== undefined ? index + 1 : ""));
         const pSlug = p.slug ? String(p.slug).toLowerCase().trim() : "";
@@ -42,7 +50,6 @@ export default function SingleProductPage() {
         return;
       }
 
-      // ২. লোকাল ফাইলে না পেলে সরাসরি API (/api/products) থেকে ফেচ করা
       try {
         const res = await fetch("/api/products", { cache: "no-store" });
         const apiData = await res.json();
@@ -57,7 +64,7 @@ export default function SingleProductPage() {
           }
         }
       } catch (err) {
-        console.error("প্রোডাক্ট ফেচিং এরর:", err);
+        console.error("প্রোডাক্ট লোড এরর:", err);
       }
 
       if (isMounted) {
@@ -76,11 +83,11 @@ export default function SingleProductPage() {
     return (
       <div className="min-h-screen bg-[#0a0a0a] text-white flex flex-col items-center justify-center p-4 space-y-4 font-sans">
         <p className="text-base font-bold text-rose-500">
-          দুঃখিত! পণ্যটি খুঁজে পাওয়া যায়নি।
+          দুঃখিত! পণ্যটি খুঁজে পাওয়া যায়নি।
         </p>
         <button
           onClick={() => router.push("/")}
-          className="bg-[#f8931f] hover:bg-[#e08219] text-white text-xs font-bold px-4 py-2 rounded-xl transition"
+          className="bg-[#f8931f] hover:bg-[#e08219] text-white text-xs font-bold px-4 py-2 rounded-xl transition cursor-pointer"
         >
           হোমপেজে ফিরে যান
         </button>
@@ -103,7 +110,7 @@ export default function SingleProductPage() {
 
   return (
     <main className="min-h-screen bg-[#0a0a0a] text-white py-6">
-      <ProductDetail product={product} onBack={() => router.push("/")} />
+      <ProductDetail product={product} onBack={handleBackStep} />
     </main>
   );
 }

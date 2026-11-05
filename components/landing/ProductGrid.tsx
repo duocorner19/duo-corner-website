@@ -182,10 +182,7 @@ export default function ProductGrid({
             >
               <Link
                 href={productUrl}
-                onClick={() => {
-                  handleSaveScrollPosition();
-                  if (onDetails) onDetails(product);
-                }}
+                onClick={handleSaveScrollPosition}
                 className="aspect-square bg-gray-100 relative overflow-hidden cursor-pointer block"
               >
                 {discountPercent > 0 && (
@@ -210,10 +207,7 @@ export default function ProductGrid({
 
                   <Link
                     href={productUrl}
-                    onClick={() => {
-                      handleSaveScrollPosition();
-                      if (onDetails) onDetails(product);
-                    }}
+                    onClick={handleSaveScrollPosition}
                     className="block"
                   >
                     <h3 className="text-xs sm:text-sm font-bold text-gray-800 mt-1.5 line-clamp-2 cursor-pointer hover:text-rose-600 transition">
@@ -247,21 +241,14 @@ export default function ProductGrid({
                   <div className="grid grid-cols-2 gap-1.5">
                     <Link
                       href={productUrl}
-                      onClick={() => {
-                        handleSaveScrollPosition();
-                        if (onDetails) onDetails(product);
-                      }}
+                      onClick={handleSaveScrollPosition}
                       className="bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-bold py-2 rounded-xl transition cursor-pointer text-center flex items-center justify-center"
                     >
                       বিস্তারিত
                     </Link>
                     <Link
                       href={productUrl}
-                      onClick={() => {
-                        handleSaveScrollPosition();
-                        if (onOrder) onOrder(product);
-                        else if (onDetails) onDetails(product);
-                      }}
+                      onClick={handleSaveScrollPosition}
                       className="bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold py-2 rounded-xl transition cursor-pointer shadow-sm text-center flex items-center justify-center"
                     >
                       অর্ডার
