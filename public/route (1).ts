@@ -1,128 +1,140 @@
-import { NextResponse } from 'next/server';
-
-const GOOGLE_SHEET_URL =
-  'https://script.google.com/macros/s/AKfycbyRhXgy18iGITj89GjcnblmsTWBejfYbNgPEEquYwZtxqyWolXceVQFl-BM8iWmeTg/exec';
+import { NextResponse } from "next/server";
+import { supabase } from "@/lib/supabase"; // Supabase ক্লায়েন্ট ইমপোর্ট
 
 function imageValue(value: unknown): string {
-  return String(value ?? '').trim();
+  return String(value ?? "").trim();
 }
 
 function normalizeProduct(product: any) {
+  // Supabase টেবিলের কলাম (image_url_1, image_url_2) এবং আগের ফরম্যাট সাপোর্ট
   const imageColumns = [
-    product?.['Image URL1'],
-    product?.['Image URL2'],
-    product?.['Image URL3'],
-    product?.['Image URL4'],
-    // Spaces in header are also supported
-    product?.['Image URL 1'],
-    product?.['Image URL 2'],
-    product?.['Image URL 3'],
-    product?.['Image URL 4'],
+    product?.image_url_1,
+    product?.image_url_2,
+    product?.image_url_3,
+    product?.image_url_4,
+    product?.["Image URL1"],
+    product?.["Image URL2"],
+    product?.["Image URL3"],
+    product?.["Image URL4"],
+    product?.["Image URL 1"],
+    product?.["Image URL 2"],
+    product?.["Image URL 3"],
+    product?.["Image URL 4"],
   ];
 
   let images = imageColumns.map(imageValue).filter(Boolean);
 
   // Backward compatibility for the old single-column/comma-separated format
   if (images.length === 0) {
-    const oldValue = product?.images ?? product?.image ?? product?.['Image URL'] ?? product?.imageUrl ?? product?.F ?? '';
-    images = (Array.isArray(oldValue) ? oldValue : String(oldValue).split(','))
-      .flatMap((item: unknown) => String(item ?? '').split(','))
+    const oldValue =
+      product?.images ??
+      product?.image ??
+      product?.["Image URL"] ??
+      product?.imageUrl ??
+      product?.F ??
+      "";
+    images = (Array.isArray(oldValue) ? oldValue : String(oldValue).split(","))
+      .flatMap((item: unknown) => String(item ?? "").split(","))
       .map(imageValue)
       .filter(Boolean);
   }
 
   // Keep remote image URLs intact; prefix local public filenames with '/'
   images = images.map((image) =>
-    /^https?:\/\//i.test(image) ? image : `/${image.replace(/^\/+/, '')}`
+    /^https?:\/\//i.test(image) ? image : `/${image.replace(/^\/+/, "")}`,
   );
 
   return {
     ...product,
+    // ফ্রন্টএন্ড যাতে আগের নামেই ডেটা পায় তার ব্যাকওয়ার্ড সাপোর্ট
+    productName: product.product_name ?? product.productName,
+    regularPrice: product.regular_price ?? product.regularPrice,
+    offerPrice: product.offer_price ?? product.offerPrice,
     images,
-    image: images[0] ?? '',
-    imageUrl: images[0] ?? '',
+    image: images[0] ?? "",
+    imageUrl: images[0] ?? "",
   };
 }
 
+// ১. POST: নতুন প্রোডাক্ট সরাসরি Supabase-এর products টেবিলে সেভ করা
 export async function POST(request: Request) {
   try {
     const body = await request.json();
 
-    const response = await fetch(GOOGLE_SHEET_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        action: 'add_product',
-        productName: body.productName || '',
-        category: body.category || '',
-        price: body.price || 0,
-        stock: body.stock || 0,
-        description: body.description || '',
-        imageUrl: body.imageUrl || '',
-        imageUrl1: body.imageUrl1 || body['Image URL1'] || '',
-        imageUrl2: body.imageUrl2 || body['Image URL2'] || '',
-        imageUrl3: body.imageUrl3 || body['Image URL3'] || '',
-        imageUrl4: body.imageUrl4 || body['Image URL4'] || '',
-      }),
-      cache: 'no-store',
-    });
+    const payload = {
+      product_name: body.product_name || body.productName || "",
+      regular_price: Number(
+        body.regular_price || body.regularPrice || body.price || 0,
+      ),
+      offer_price:
+        body.offer_price || body.offerPrice
+          ? Number(body.offer_price || body.offerPrice)
+          : null,
+      category: body.category || "",
+      stock: Number(body.stock || 0),
+      description: body.description || null,
+      image_url_1:
+        body.image_url_1 ||
+        body.imageUrl1 ||
+        body.imageUrl ||
+        body["Image URL1"] ||
+        "",
+      image_url_2:
+        body.image_url_2 || body.imageUrl2 || body["Image URL2"] || null,
+      image_url_3:
+        body.image_url_3 || body.imageUrl3 || body["Image URL3"] || null,
+      image_url_4:
+        body.image_url_4 || body.imageUrl4 || body["Image URL4"] || null,
+      video_url: body.video_url || body.videoUrl || null,
+      product_type: body.product_type || body.productType || null,
+      usable_gender: body.usable_gender || body.usableGender || "Unisex",
+      material: body.material || null,
+      color: body.color || null,
+      package_size: body.package_size || body.packageSize || null,
+      gross_weight: body.gross_weight || body.grossWeight || null,
+    };
 
-    if (!response.ok) {
-      throw new Error('Google Sheet-এ প্রোডাক্ট পাঠানো যায়নি।');
+    const { data, error } = await supabase
+      .from("products")
+      .insert([payload])
+      .select();
+
+    if (error) {
+      throw error;
     }
 
     return NextResponse.json({
       success: true,
-      message: 'Product added successfully',
+      message: "Product added successfully",
+      data,
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown server error';
+    const message =
+      error instanceof Error ? error.message : "Unknown server error";
+    console.error("Supabase Products API POST error:", error);
     return NextResponse.json({ success: false, message }, { status: 500 });
   }
 }
 
+// ২. GET: Supabase থেকে সুপারফাস্ট স্পিডে প্রোডাক্ট ফেচ করা
 export async function GET() {
   try {
-    const response = await fetch(`${GOOGLE_SHEET_URL}?action=get_products`, {
-      cache: 'no-store',
-    });
+    const { data, error } = await supabase
+      .from("products")
+      .select("*")
+      .order("id", { ascending: false });
 
-    if (!response.ok) throw new Error('Google Sheet থেকে প্রোডাক্ট আনা যায়নি।');
-
-    const data = await response.json();
-
-    if (Array.isArray(data)) {
-      return NextResponse.json(data.map(normalizeProduct));
+    if (error) {
+      throw error;
     }
 
-    if (data && typeof data === 'object') {
-      for (const key of ['products', 'data', 'items']) {
-        if (Array.isArray(data[key])) {
-          return NextResponse.json({
-            ...data,
-            [key]: data[key].map(normalizeProduct),
-          });
-        }
-      }
-
-      if (
-        data['Image URL1'] !== undefined ||
-        data['Image URL2'] !== undefined ||
-        data['Image URL3'] !== undefined ||
-        data['Image URL4'] !== undefined ||
-        data.imageUrl !== undefined ||
-        data.images !== undefined
-      ) {
-        return NextResponse.json(normalizeProduct(data));
-      }
-    }
-
-    return NextResponse.json(data);
+    const normalizedData = (data || []).map(normalizeProduct);
+    return NextResponse.json(normalizedData);
   } catch (error) {
-    console.error('Products API error:', error);
+    console.error("Products API GET error:", error);
     return NextResponse.json(
-      { success: false, message: 'প্রোডাক্ট লোড করা যায়নি।' },
-      { status: 500 }
+      { success: false, message: "প্রোডাক্ট লোড করা যায়নি।" },
+      { status: 500 },
     );
   }
 }

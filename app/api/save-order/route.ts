@@ -1,18 +1,19 @@
 import { NextResponse } from "next/server";
 import crypto from "crypto";
+import { supabase } from "@/lib/supabase"; // Supabase ক্লায়েন্ট ইমপোর্ট করা হলো
 
-const GOOGLE_SHEET_URL =
-  process.env.GOOGLE_SHEET_URL ||
-  "https://script.google.com/macros/s/AKfycbyRhXgy18iGITj89GjcnblmsTWBejfYbNgPEEquYwZtxqyWolXceVQFl-BM8iWmeTg/exec";
-
-// ১. GET: গুগল শিট থেকে রিয়েল-টাইম অর্ডার ফেচ করা
+// ১. GET: Supabase থেকে রিয়েল-টাইম অর্ডার ফেচ করা (গুগল শিটের বদলে)
 export async function GET() {
   try {
-    const response = await fetch(GOOGLE_SHEET_URL, { cache: "no-store" });
-    if (!response.ok) {
-      throw new Error("Google Sheet থেকে অর্ডার ডেটা আনা যায়নি।");
+    const { data, error } = await supabase
+      .from("orders")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      throw error;
     }
-    const data = await response.json();
+
     return NextResponse.json(Array.isArray(data) ? data : []);
   } catch (error) {
     console.error("Orders API GET error:", error);
@@ -20,31 +21,51 @@ export async function GET() {
   }
 }
 
-// ২. POST: ওয়েবসাইট থেকে কাস্টমার অর্ডার সরাসরি গুগল শিটে সেভ করা
+// ২. POST: ওয়েবসাইট থেকে কাস্টমার অর্ডার সরাসরি Supabase-এ সেভ করা
 export async function POST(request: Request) {
   try {
     const body = await request.json();
 
-    const response = await fetch(GOOGLE_SHEET_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        action: "add_order",
-        ...body,
-      }),
-      cache: "no-store",
-    });
+    const targetOrderId =
+      body.order_id || body.orderId || `ORD-${Date.now().toString().slice(-6)}`;
+    const customerName =
+      body.name || body.customer_name || body.fullName || "Valued Customer";
+    const customerPhone = String(body.number || body.phone || "");
+    const customerAddress = body.address || "";
+    const totalAmount = Number(
+      body.collection_amount || body.total || body.collectionAmount || 0,
+    );
 
-    if (!response.ok) {
-      throw new Error("Google Sheet-এ অর্ডার পাঠানো যায়নি।");
+    const { data, error } = await supabase
+      .from("orders")
+      .insert([
+        {
+          order_id: targetOrderId,
+          name: customerName,
+          number: customerPhone,
+          address: customerAddress,
+          collection_amount: totalAmount,
+          tracking_id: body.tracking_id || "",
+          status: body.status || "pending",
+          courier_action: body.courier_action || "",
+          utm_source: body.utm_source || "",
+          utm_campaign: body.utm_campaign || "",
+        },
+      ])
+      .select();
+
+    if (error) {
+      throw error;
     }
 
-    const result = await response.json().catch(() => ({ status: "success" }));
-    return NextResponse.json(result);
-  } catch (error) {
+    return NextResponse.json({ status: "success", data });
+  } catch (error: unknown) {
     console.error("Orders API POST error:", error);
     return NextResponse.json(
-      { status: "error", message: "Order save failed" },
+      {
+        status: "error",
+        message: error instanceof Error ? error.message : "Order save failed",
+      },
       { status: 500 },
     );
   }
@@ -58,11 +79,19 @@ export async function PUT(request: Request) {
     const API_KEY = "nhebmum6ll3aeirxkoa0djqscqckyjn3";
     const SECRET_KEY = "9clfsi0vrhrbzwupeojrymau";
 
-    const targetOrderId = String(body.id || body.orderId || "DC-1");
-    const targetPhone = String(body.phone || body.customerPhone || "");
+    const targetOrderId = String(
+      body.id || body.orderId || body.order_id || "DC-1",
+    );
+    const targetPhone = String(
+      body.phone || body.customerPhone || body.number || "",
+    );
     const customerName = body.name || body.customerName || "Valued Customer";
     const totalAmount = Number(
-      body.totalPrice || body.collectionAmount || body.amount || 0,
+      body.totalPrice ||
+        body.collectionAmount ||
+        body.amount ||
+        body.collection_amount ||
+        0,
     );
 
     const payload = {
@@ -98,22 +127,18 @@ export async function PUT(request: Request) {
         result.consignment?.consignment_id || result.consignment_id || "1",
       );
 
-      // ক. কুরিয়ারে বুকিং সফল হওয়ার পর গুগল শিটে স্ট্যাটাস ও ট্র্যাকিং আইডি আপডেট
+      // ক. কুরিয়ারে বুকিং সফল হওয়ার পর Supabase-এ স্ট্যাটাস ও ট্র্যাকিং আইডি আপডেট
       try {
-        await fetch(GOOGLE_SHEET_URL, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            action: "update_order_status",
-            orderId: targetOrderId,
-            phone: targetPhone,
+        await supabase
+          .from("orders")
+          .update({
             status: "Booked",
-            trackingCode: consignmentId,
-          }),
-          cache: "no-store",
-        });
-      } catch (sheetErr) {
-        console.error("Google sheet status update error:", sheetErr);
+            tracking_id: consignmentId,
+            courier_action: "Steadfast Booked",
+          })
+          .eq("order_id", targetOrderId);
+      } catch (dbErr) {
+        console.error("Supabase status update error:", dbErr);
       }
 
       // খ. শুধুমাত্র কনফার্মড বুকিং হওয়ার পরেই ফেসবুক Conversion API (CAPI) এর মাধ্যমে Purchase ইভেন্ট পাঠানো
@@ -188,7 +213,7 @@ async function sendMetaCAPI({
   }
 
   try {
-    const metaRes = await fetch(
+    await fetch(
       `https://graph.facebook.com/v19.0/${PIXEL_ID}/events?access_token=${ACCESS_TOKEN}`,
       {
         method: "POST",
@@ -218,23 +243,6 @@ async function sendMetaCAPI({
         }),
       },
     );
-
-    // গুগল শিটের Tracking_Logs-এ স্ট্যাটাস সেভ করা
-    if (GOOGLE_SHEET_URL) {
-      await fetch(GOOGLE_SHEET_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "log_tracking_event",
-          eventName: "Purchase",
-          orderId: orderId,
-          status: metaRes.ok ? "Success" : "Failed",
-          amount: value,
-          traceId: consignmentId,
-        }),
-        cache: "no-store",
-      }).catch(() => {});
-    }
   } catch (err) {
     console.error("Meta CAPI execution error:", err);
   }
