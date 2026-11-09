@@ -38,30 +38,24 @@ import {
 
 type Order = {
   id?: string | number;
+  order_id?: string;
   orderId?: string;
-  Timestamp?: string;
-  Date?: string;
-  Time?: string;
+  created_at?: string;
+  date?: string;
+  time?: string;
   name?: string;
-  Name?: string;
+  number?: string;
   phone?: string;
-  Phone?: string;
+  product_name?: string;
   productName?: string;
   note?: string;
-  "Product/Note"?: string;
-  quantity?: number;
   address?: string;
-  Address?: string;
-  thana?: string;
-  district?: string;
-  division?: string;
+  collection_amount?: number;
   totalPrice?: number;
-  amount?: number;
-  Amount?: number;
-  collectionAmount?: number;
+  tracking_id?: string;
   trackingCode?: string;
   status?: string;
-  Status?: string;
+  courier_action?: string;
   courierAction?: string;
 };
 
@@ -99,7 +93,6 @@ export default function AdminDashboard() {
   const [products, setProducts] = useState<any[]>([]);
   const [productSearch, setProductSearch] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [activeSubTab, setActiveSubTab] = useState<"list" | "add">("list");
 
   // Automated Fraud Checker & Customer 360 States
   const [selectedCustomer, setSelectedCustomer] = useState<any | null>(null);
@@ -107,9 +100,6 @@ export default function AdminDashboard() {
   const [fraudReportMap, setFraudReportMap] = useState<{
     [phone: string]: any;
   }>({});
-
-  // Payment & COD Settlement States
-  const [settlementFilter, setSettlementFilter] = useState("all");
 
   // Automation Rules States
   const [rules, setRules] = useState([
@@ -132,9 +122,8 @@ export default function AdminDashboard() {
       status: true,
     },
   ]);
-  const [newRuleName, setNewRuleName] = useState("");
 
-  // ক্যাটাগরি স্টেট (গুগল শিটের সাথে সিঙ্কড)
+  // ক্যাটাগরি স্টেট
   const [categories, setCategories] = useState<string[]>([
     "ব্রেসলেট (Bracelet)",
     "নেকলেস (Necklace)",
@@ -144,7 +133,7 @@ export default function AdminDashboard() {
   const [newCategoryName, setNewCategoryName] = useState("");
   const [categoryLoading, setCategoryLoading] = useState(false);
 
-  // নতুন প্রোডাক্ট ও ডায়নামিক স্পেসিফিকেশন স্টেট
+  // নতুন প্রোডাক্ট স্টেট (Supabase স্কিমার সাথে সিঙ্কড)
   const [productForm, setProductForm] = useState({
     productName: "",
     category: "ব্রেসলেট (Bracelet)",
@@ -157,14 +146,12 @@ export default function AdminDashboard() {
     imageUrl3: "parl2.jpg",
     imageUrl4: "parl3.jpg",
     videoUrl: "/video.mp4",
-    specs: [
-      { label: "Product Type", value: "Smart Couple Jewelry" },
-      { label: "Design", value: "Magnetic Sun & Moon" },
-      { label: "Material", value: "Titanium Steel & Milan Rope" },
-      { label: "Color", value: "Black & Rose Gold" },
-      { label: "Size", value: "Adjustable Free Size" },
-      { label: "Origin", value: "Imported" },
-    ],
+    productType: "Smart Couple Jewelry",
+    usableGender: "Unisex",
+    material: "Titanium Steel & Milan Rope",
+    color: "Black & Rose Gold",
+    packageSize: "Adjustable Free Size",
+    grossWeight: "50g",
   });
 
   // Marketing & Pixels Hub State
@@ -180,7 +167,7 @@ export default function AdminDashboard() {
   });
   const [pixelSaved, setPixelSaved] = useState(false);
 
-  // ডাটা লোড
+  // ডাটা ফেচিং ফাংশন
   const fetchOrders = async () => {
     try {
       const res = await fetch("/api/save-order");
@@ -189,11 +176,11 @@ export default function AdminDashboard() {
         setOrders(data);
         if (data.length > 0 && !selectedCustomer) {
           setSelectedCustomer(data[0]);
-          void fetchAutomatedFraudData(data[0].phone || data[0].Phone || "");
+          void fetchAutomatedFraudData(data[0].number || data[0].phone || "");
         }
       }
     } catch {
-      console.error("Data fetch error");
+      console.error("Orders fetch error");
     } finally {
       setLoading(false);
     }
@@ -205,30 +192,23 @@ export default function AdminDashboard() {
       const data = await res.json();
       if (Array.isArray(data)) setProducts(data);
     } catch {
-      console.error("Error fetching products");
+      console.error("Products fetch error");
     }
   };
 
-  // গুগল শিট থেকে ক্যাটাগরি লোড
   const fetchCategories = async () => {
     try {
       const res = await fetch("/api/categories");
       const data = await res.json();
       if (
-        data.success &&
+        data?.success &&
         Array.isArray(data.categories) &&
         data.categories.length > 0
       ) {
         setCategories(data.categories);
-        setProductForm((prev) => ({
-          ...prev,
-          category: data.categories.includes(prev.category)
-            ? prev.category
-            : data.categories[0],
-        }));
       }
-    } catch (err) {
-      console.warn("Failed to fetch categories from API, using defaults.");
+    } catch {
+      console.warn("Using default categories.");
     }
   };
 
@@ -272,7 +252,7 @@ export default function AdminDashboard() {
           if (orderData.length > 0) {
             setSelectedCustomer(orderData[0]);
             void fetchAutomatedFraudData(
-              orderData[0].phone || orderData[0].Phone || "",
+              orderData[0].number || orderData[0].phone || "",
             );
           }
         }
@@ -280,7 +260,7 @@ export default function AdminDashboard() {
           setProducts(productData);
         }
       } catch {
-        console.error("Data fetch error");
+        console.error("Dashboard data load error");
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -304,11 +284,10 @@ export default function AdminDashboard() {
     };
   }, []);
 
-  // ক্যাটাগরি তৈরি করার ফাংশন
+  // ক্যাটাগরি যোগ ও মোছা
   const handleAddCategory = async () => {
     if (!newCategoryName.trim()) return;
     setCategoryLoading(true);
-
     try {
       const res = await fetch("/api/categories", {
         method: "POST",
@@ -324,16 +303,14 @@ export default function AdminDashboard() {
         alert("⚠️ " + data.message);
       }
     } catch {
-      alert("❌ ক্যাটাগরি সেভ করার সময় সার্ভার এরর হয়েছে!");
+      alert("❌ ক্যাটাগরি সেভ করতে সমস্যা হয়েছে!");
     } finally {
       setCategoryLoading(false);
     }
   };
 
-  // ক্যাটাগরি মুছে ফেলার ফাংশন
   const handleDeleteCategory = async (catName: string) => {
     if (!confirm(`আপনি কি "${catName}" ক্যাটাগরি মুছে ফেলতে চান?`)) return;
-
     try {
       const res = await fetch("/api/categories", {
         method: "DELETE",
@@ -344,8 +321,6 @@ export default function AdminDashboard() {
       if (data.success) {
         setCategories((prev) => prev.filter((c) => c !== catName));
         alert("✅ " + data.message);
-      } else {
-        alert("⚠️ " + data.message);
       }
     } catch {
       alert("❌ ডিলিট রিকোয়েস্ট ব্যর্থ হয়েছে!");
@@ -354,21 +329,18 @@ export default function AdminDashboard() {
 
   // Steadfast কুরিয়ার বুকিং হ্যান্ডলার
   const handleCourierBooking = async (order: Order, index: number) => {
-    const orderId = order.orderId || order.id || `ORD-${index + 1}`;
+    const orderId =
+      order.order_id || order.orderId || order.id || `ORD-${index + 1}`;
     setBookingLoading(String(orderId));
 
-    const rawPhone = String(order.phone || order.Phone || "");
+    const rawPhone = String(order.number || order.phone || "");
     let formattedPhone = rawPhone.replace(/\D/g, "");
     if (formattedPhone.length === 10 && !formattedPhone.startsWith("0")) {
       formattedPhone = "0" + formattedPhone;
     }
 
     const cleanAmount = Number(
-      order.totalPrice ||
-        order.amount ||
-        order.Amount ||
-        order.collectionAmount ||
-        0,
+      order.collection_amount || order.totalPrice || 0,
     );
 
     try {
@@ -377,31 +349,22 @@ export default function AdminDashboard() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           id: orderId,
-          name: order.name || order.Name || "Customer",
+          name: order.name || "Customer",
           phone: formattedPhone,
-          address: order.address || order.Address || "N/A",
+          address: order.address || "N/A",
           totalPrice: cleanAmount,
-          thana: order.thana || "",
-          district: order.district || "",
-          productName:
-            order.productName ||
-            order.note ||
-            order["Product/Note"] ||
-            "Product",
         }),
       });
 
       const result = await res.json();
       if (result.success) {
-        alert(
-          `✅ সফল! কুরিয়ার কনসাইনমেন্ট ট্র্যাকিং আইডি (CN): ${result.consignmentId}`,
-        );
+        alert(`✅ সফল! কুরিয়ার ট্র্যাকিং আইডি: ${result.consignmentId}`);
         setOrders((prevOrders) => {
           const updated = [...prevOrders];
           updated[index] = {
             ...updated[index],
             status: "Booked",
-            Status: "Booked",
+            tracking_id: result.consignmentId,
             trackingCode: result.consignmentId,
           };
           return updated;
@@ -416,18 +379,7 @@ export default function AdminDashboard() {
     }
   };
 
-  // স্পেক্স ইনপুট আপডেট হ্যান্ডলার
-  const handleSpecChange = (
-    index: number,
-    field: "label" | "value",
-    val: string,
-  ) => {
-    const updatedSpecs = [...productForm.specs];
-    updatedSpecs[index][field] = val;
-    setProductForm({ ...productForm, specs: updatedSpecs });
-  };
-
-  // প্রোডাক্ট আপলোড ও গুগল শিটে সেভ হ্যান্ডলার
+  // নতুন প্রোডাক্ট Supabase-এ সেভ করার হ্যান্ডলার
   const handleSaveProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!productForm.productName || !productForm.offerPrice) {
@@ -437,41 +389,41 @@ export default function AdminDashboard() {
 
     setIsSubmitting(true);
     try {
-      const validAttributes = productForm.specs.filter(
-        (s) => s.label.trim() && s.value.trim(),
-      );
-
       const res = await fetch("/api/products", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          action: "add_product",
-          productName: productForm.productName,
+          product_name: productForm.productName,
           category: productForm.category,
-          regularPrice:
+          regular_price:
             Number(productForm.regularPrice) || Number(productForm.offerPrice),
-          price: Number(productForm.offerPrice),
+          offer_price: Number(productForm.offerPrice),
           stock: Number(productForm.stock) || 100,
           description: productForm.description,
-          imageUrl1: productForm.imageUrl1 || "parl.jpg",
-          imageUrl2: productForm.imageUrl2 || "parl1.jpg",
-          imageUrl3: productForm.imageUrl3 || "parl2.jpg",
-          imageUrl4: productForm.imageUrl4 || "parl3.jpg",
-          videoUrl: productForm.videoUrl || "/video.mp4",
-          attributes: JSON.stringify(validAttributes),
+          image_url_1: productForm.imageUrl1 || "parl.jpg",
+          image_url_2: productForm.imageUrl2 || "parl1.jpg",
+          image_url_3: productForm.imageUrl3 || "parl2.jpg",
+          image_url_4: productForm.imageUrl4 || "parl3.jpg",
+          video_url: productForm.videoUrl || "/video.mp4",
+          product_type: productForm.productType,
+          usable_gender: productForm.usableGender,
+          material: productForm.material,
+          color: productForm.color,
+          package_size: productForm.packageSize,
+          gross_weight: productForm.grossWeight,
         }),
       });
 
       const data = await res.json();
-      if (data.success || data.status === "success") {
-        alert(
-          "✅ প্রোডাক্ট ও সম্পূর্ণ স্পেসিফিকেশন গুগল শিটে সফলভাবে সেভ হয়েছে!",
-        );
+      if (data.success) {
+        alert("✅ প্রোডাক্টটি সফলভাবে Supabase ডেটাবেজে যুক্ত হয়েছে!");
         fetchProducts();
         setActiveTab("inventory");
-        setActiveSubTab("list");
       } else {
-        alert("❌ প্রোডাক্ট সেভ করতে ব্যর্থ হয়েছে!");
+        alert(
+          "❌ প্রোডাক্ট সেভ করতে ব্যর্থ হয়েছে: " +
+            (data.message || "Unknown error"),
+        );
       }
     } catch {
       alert("সার্ভার এরর!");
@@ -480,7 +432,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // পিক্সেল সেভ
   const handleSavePixels = (e: React.FormEvent) => {
     e.preventDefault();
     localStorage.setItem("duo_pixel_config", JSON.stringify(pixelConfig));
@@ -507,7 +458,7 @@ export default function AdminDashboard() {
             Duo Corner Admin Panel
           </h1>
           <p className="text-xs text-slate-400 mt-1">
-            অ্যাডমিন ড্যাশবোর্ডে প্রবেশ করতে আপনার আইডি দিয়ে সাইন ইন করুন
+            অ্যাডমিন ড্যাশবোর্ডে প্রবেশ করতে সাইন ইন করুন
           </p>
         </div>
         <div className="bg-slate-900 p-4 rounded-3xl shadow-xl border border-slate-800">
@@ -541,71 +492,53 @@ export default function AdminDashboard() {
   const totalOrders = orders.length;
   const totalSales = orders.reduce(
     (acc, o) =>
-      acc +
-      (Number(o.totalPrice) ||
-        Number(o.amount) ||
-        Number(o.Amount) ||
-        Number(o.collectionAmount) ||
-        0),
+      acc + (Number(o.collection_amount) || Number(o.totalPrice) || 0),
     0,
   );
   const mealFundTotal = totalOrders * 10;
   const pendingCount = orders.filter(
-    (o) => String(o.status || o.Status || "").toLowerCase() === "pending",
+    (o) => String(o.status || "").toLowerCase() === "pending",
   ).length;
 
   const deliveredOrdersList = orders.filter(
     (o) =>
-      String(o.status || o.Status || "").toLowerCase() === "delivered" ||
-      String(o.courierAction || "").toLowerCase() === "completed",
+      String(o.status || "").toLowerCase() === "delivered" ||
+      String(o.courier_action || o.courierAction || "").toLowerCase() ===
+        "completed",
   );
   const totalCodCollection = deliveredOrdersList.reduce(
     (acc, o) =>
-      acc +
-      (Number(o.totalPrice) ||
-        Number(o.amount) ||
-        Number(o.Amount) ||
-        Number(o.collectionAmount) ||
-        0),
+      acc + (Number(o.collection_amount) || Number(o.totalPrice) || 0),
     0,
   );
   const courierDueAmount = orders
-    .filter(
-      (o) =>
-        String(o.status || o.Status || "").toLowerCase() === "booked" ||
-        String(o.status || o.Status || "").toLowerCase() === "processing",
-    )
+    .filter((o) => String(o.status || "").toLowerCase() === "booked")
     .reduce(
       (acc, o) =>
-        acc +
-        (Number(o.totalPrice) ||
-          Number(o.amount) ||
-          Number(o.Amount) ||
-          Number(o.collectionAmount) ||
-          0),
+        acc + (Number(o.collection_amount) || Number(o.totalPrice) || 0),
       0,
     );
   const bankReceivedAmount = totalCodCollection * 0.85;
 
   const filteredOrders = orders
     .filter((order) => {
-      const name = String(order.name || order.Name || "").toLowerCase();
-      const phone = String(order.phone || order.Phone || "");
-      const district = String(order.district || "").toLowerCase();
+      const name = String(order.name || "").toLowerCase();
+      const phone = String(order.number || order.phone || "");
+      const address = String(order.address || "").toLowerCase();
       return (
         name.includes(searchTerm.toLowerCase()) ||
         phone.includes(searchTerm) ||
-        district.includes(searchTerm.toLowerCase())
+        address.includes(searchTerm.toLowerCase())
       );
     })
     .reverse();
 
   const filteredProducts = products.filter(
     (p) =>
-      String(p["Product Name"] || p.productName || "")
+      String(p.product_name || p.productName || "")
         .toLowerCase()
         .includes(productSearch.toLowerCase()) ||
-      String(p["Category"] || p.category || "")
+      String(p.category || "")
         .toLowerCase()
         .includes(productSearch.toLowerCase()),
   );
@@ -620,7 +553,7 @@ export default function AdminDashboard() {
               DUO CORNER
             </h2>
             <p className="text-[10px] text-rose-400 font-semibold uppercase tracking-widest mt-0.5">
-              Smart Commerce System
+              Supabase Connected
             </p>
           </div>
 
@@ -653,7 +586,7 @@ export default function AdminDashboard() {
                   : "text-slate-400 hover:bg-slate-800 hover:text-white"
               }`}
             >
-              🏷️ Products & Inventory
+              🏷️ Products & Inventory ({products.length})
             </button>
             <button
               onClick={() => setActiveTab("upload")}
@@ -695,23 +628,6 @@ export default function AdminDashboard() {
             >
               📈 Marketing & Pixels
             </button>
-
-            {/* ডেডিকেটেড সাব-মডিউল লিংক */}
-            <div className="pt-2 border-t border-slate-800/80 my-1">
-              <Link
-                href="/admin/settlements"
-                className="w-full text-left px-4 py-2 rounded-xl transition cursor-pointer flex items-center gap-3 text-emerald-400 hover:bg-slate-800 hover:text-emerald-300 font-bold"
-              >
-                💵 Settlements Center ↗
-              </Link>
-              <Link
-                href="/admin/settings"
-                className="w-full text-left px-4 py-2 rounded-xl transition cursor-pointer flex items-center gap-3 text-indigo-400 hover:bg-slate-800 hover:text-indigo-300 font-bold"
-              >
-                ⚙️ Module 13: System Control ↗
-              </Link>
-            </div>
-
             <button
               onClick={() => setActiveTab("settlements")}
               className={`w-full text-left px-4 py-2.5 rounded-xl transition cursor-pointer flex items-center gap-3 ${
@@ -740,7 +656,7 @@ export default function AdminDashboard() {
                   : "text-slate-400 hover:bg-slate-800 hover:text-white"
               }`}
             >
-              📑 Professional Reports
+              📑 Reports & Analytics
             </button>
             <button
               onClick={() => setActiveTab("staff")}
@@ -797,8 +713,8 @@ export default function AdminDashboard() {
 
         <div className="pt-4 border-t border-slate-800 text-[11px] text-slate-500">
           <p>
-            System Status:{" "}
-            <span className="text-emerald-400 font-bold">● Live Synced</span>
+            Database:{" "}
+            <span className="text-emerald-400 font-bold">● Supabase Live</span>
           </p>
           <button
             onClick={() => signOut()}
@@ -815,7 +731,7 @@ export default function AdminDashboard() {
           <div className="w-full sm:w-80">
             <input
               type="text"
-              placeholder="🔍 গ্রাহকের নাম, ফোন বা জেলা দিয়ে খুঁজুন..."
+              placeholder="🔍 গ্রাহকের নাম, ফোন বা ঠিকানা দিয়ে খুঁজুন..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-rose-500"
@@ -939,7 +855,7 @@ export default function AdminDashboard() {
                   </button>
                 </div>
                 <div className="bg-slate-900/80 p-3 rounded-xl border border-amber-500/20 flex items-center justify-between">
-                  <span>📦 Stock Products Synced: {products.length} Pcs</span>
+                  <span>📦 Products in Supabase: {products.length} Pcs</span>
                   <button
                     onClick={() => setActiveTab("inventory")}
                     className="font-bold underline cursor-pointer text-amber-400"
@@ -948,7 +864,7 @@ export default function AdminDashboard() {
                   </button>
                 </div>
                 <div className="bg-slate-900/80 p-3 rounded-xl border border-amber-500/20 flex items-center justify-between">
-                  <span>💳 Steadfast Courier API Active</span>
+                  <span>💳 Steadfast API Status</span>
                   <span className="font-bold text-emerald-400">Ready</span>
                 </div>
               </div>
@@ -967,11 +883,10 @@ export default function AdminDashboard() {
                 <thead>
                   <tr className="border-b border-slate-800 text-slate-400">
                     <th className="p-3">Order ID</th>
-                    <th className="p-3">Date</th>
                     <th className="p-3">Name</th>
                     <th className="p-3">Number</th>
                     <th className="p-3">Address</th>
-                    <th className="p-3">Collection Amount</th>
+                    <th className="p-3">Amount</th>
                     <th className="p-3">Status</th>
                     <th className="p-3 text-center">Courier Action</th>
                   </tr>
@@ -979,37 +894,33 @@ export default function AdminDashboard() {
                 <tbody className="divide-y divide-slate-800/60">
                   {filteredOrders.map((order, idx) => {
                     const currentId =
-                      order.orderId || order.id || `ORD-${idx + 1}`;
-                    const cName =
-                      order.name || order.Name || "Unknown Customer";
-                    const cPhone = order.phone || order.Phone || "No Number";
-                    const cAddress = order.address || order.Address || "N/A";
-                    const cAmount =
-                      order.totalPrice ||
-                      order.amount ||
-                      order.Amount ||
-                      order.collectionAmount ||
-                      0;
-                    const cStatus = order.status || order.Status || "Pending";
-                    const cDate = order.Timestamp || order.Date || "N/A";
+                      order.order_id ||
+                      order.orderId ||
+                      order.id ||
+                      `ORD-${idx + 1}`;
+                    const cName = order.name || "Unknown Customer";
+                    const cPhone = order.number || order.phone || "No Number";
+                    const cAddress = order.address || "N/A";
+                    const cAmount = Number(
+                      order.collection_amount || order.totalPrice || 0,
+                    );
+                    const cStatus = order.status || "pending";
 
-                    const isBooked =
-                      cStatus.toLowerCase() === "booked" ||
-                      cStatus.toLowerCase() === "sent";
+                    const isBooked = cStatus.toLowerCase() === "booked";
 
                     return (
                       <tr key={idx} className="hover:bg-slate-800/50">
                         <td className="p-3 font-bold text-rose-400">
                           {currentId}
                         </td>
-                        <td className="p-3 text-slate-400 text-[11px]">
-                          {cDate}
-                        </td>
                         <td className="p-3 font-bold text-white">{cName}</td>
                         <td className="p-3 text-slate-300 font-mono">
                           {cPhone}
                         </td>
-                        <td className="p-3 text-slate-400 max-w-xs truncate">
+                        <td
+                          className="p-3 text-slate-400 max-w-xs truncate"
+                          title={cAddress}
+                        >
                           {cAddress}
                         </td>
                         <td className="p-3 font-black text-white">
@@ -1041,7 +952,7 @@ export default function AdminDashboard() {
                             {bookingLoading === String(currentId)
                               ? "Booking..."
                               : isBooked
-                                ? "✅ Booked"
+                                ? `✅ ${order.tracking_id || "Booked"}`
                                 : "🚚 Steadfast"}
                           </button>
                         </td>
@@ -1091,13 +1002,13 @@ export default function AdminDashboard() {
                 </thead>
                 <tbody className="divide-y divide-slate-800/60">
                   {filteredProducts.map((p, idx) => {
-                    const stockNum = Number(p.Stock || p.stock || 0);
+                    const stockNum = Number(p.stock || 0);
                     const isLowStock = stockNum < 5;
 
                     return (
                       <tr key={idx} className="hover:bg-slate-800/50">
                         <td className="p-3 font-bold text-white flex items-center gap-2">
-                          {p["Product Name"] || p.productName || "N/A"}
+                          {p.product_name || p.productName || "N/A"}
                           {isLowStock && (
                             <span className="text-[10px] bg-rose-500/20 text-rose-400 px-2 py-0.5 rounded font-bold">
                               Low Stock!
@@ -1105,13 +1016,13 @@ export default function AdminDashboard() {
                           )}
                         </td>
                         <td className="p-3 text-slate-300">
-                          {p.Category || p.category || "General"}
+                          {p.category || "General"}
                         </td>
                         <td className="p-3 text-slate-400 line-through">
-                          ৳{p["Regular Price"] || p.regularPrice || 0}
+                          ৳{p.regular_price || p.regularPrice || 0}
                         </td>
                         <td className="p-3 font-black text-emerald-400">
-                          ৳{p["Offer Price"] || p.offerPrice || p.price || 0}
+                          ৳{p.offer_price || p.offerPrice || 0}
                         </td>
                         <td className="p-3">
                           <span
@@ -1141,10 +1052,10 @@ export default function AdminDashboard() {
           >
             <div className="border-b border-slate-800 pb-3">
               <h2 className="text-xl font-black text-white">
-                নতুন প্রোডাক্ট আপলোড ও গুগল শিট সিঙ্ক
+                নতুন প্রোডাক্ট আপলোড (Supabase Database)
               </h2>
               <p className="text-xs text-slate-400 mt-0.5">
-                আলাদা ৪টি ছবির লিংক ও ৬টি ডায়নামিক স্পেসিফিকেশন এন্ট্রি করুন।
+                আলাদা ৪টি ছবির লিংক ও পণ্য স্পেসিফিকেশন এন্ট্রি করুন।
               </p>
             </div>
 
@@ -1269,7 +1180,7 @@ export default function AdminDashboard() {
               {/* আলাদা ৪টি ছবির ইনপুট গ্রিড */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:col-span-2 bg-slate-950 p-5 rounded-2xl border border-slate-800">
                 <h3 className="text-xs font-black text-white sm:col-span-2 mb-1">
-                  🖼️ আলাদা ছবির ফাইলের নাম বা ইউআরএল (Image URL 1 to 4)
+                  🖼️ আলাদা ছবির ফাইলের নাম বা ইউআরএল (image_url_1 to 4)
                 </h3>
                 <div>
                   <label className="block text-[10px] font-bold text-slate-400 mb-1">
@@ -1338,40 +1249,6 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            {/* প্রোডাক্ট ডায়নামিক স্পেসিফিকেশন (৬টি লেবেল-ভ্যালু) */}
-            <div className="pt-4 border-t border-slate-800">
-              <h3 className="text-sm font-black text-white mb-3">
-                🏷️ প্রোডাক্ট স্পেসিফিকেশন (Label-Value Pairs)
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {productForm.specs.map((spec, idx) => (
-                  <div
-                    key={idx}
-                    className="flex gap-2 bg-slate-950 p-3 rounded-xl border border-slate-800"
-                  >
-                    <input
-                      type="text"
-                      value={spec.label}
-                      onChange={(e) =>
-                        handleSpecChange(idx, "label", e.target.value)
-                      }
-                      placeholder={`Label ${idx + 1}`}
-                      className="w-1/2 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none"
-                    />
-                    <input
-                      type="text"
-                      value={spec.value}
-                      onChange={(e) =>
-                        handleSpecChange(idx, "value", e.target.value)
-                      }
-                      placeholder={`Value ${idx + 1}`}
-                      className="w-1/2 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none"
-                    />
-                  </div>
-                ))}
-              </div>
-            </div>
-
             <button
               type="submit"
               disabled={isSubmitting}
@@ -1379,7 +1256,7 @@ export default function AdminDashboard() {
             >
               {isSubmitting
                 ? "প্রসেসিং হচ্ছে..."
-                : "💾 প্রোডাক্ট ও স্পেসিফিকেশন সেভ করুন"}
+                : "💾 Supabase-এ প্রোডাক্ট সেভ করুন"}
             </button>
           </form>
         )}
@@ -1393,9 +1270,6 @@ export default function AdminDashboard() {
                   <Tag className="text-rose-500" size={18} /> ক্যাটাগরি
                   ম্যানেজমেন্ট
                 </h3>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  গুগল শিটের সাথে লাইভ সিঙ্ক ক্যাটাগরি লিস্ট।
-                </p>
               </div>
             </div>
 
@@ -1440,29 +1314,6 @@ export default function AdminDashboard() {
         {/* CUSTOMERS & FRAUD TAB */}
         {activeTab === "customers" && (
           <div className="space-y-6">
-            <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl flex flex-wrap gap-2 text-xs font-bold">
-              <button
-                onClick={() => setCustomerSubTab("profiles")}
-                className={`px-4 py-2 rounded-xl transition cursor-pointer ${
-                  customerSubTab === "profiles"
-                    ? "bg-rose-600 text-white shadow-lg"
-                    : "bg-slate-800 text-slate-300"
-                }`}
-              >
-                Customer 360°
-              </button>
-              <button
-                onClick={() => setCustomerSubTab("fraud")}
-                className={`px-4 py-2 rounded-xl transition cursor-pointer ${
-                  customerSubTab === "fraud"
-                    ? "bg-rose-600 text-white shadow-lg"
-                    : "bg-slate-800 text-slate-300"
-                }`}
-              >
-                Fraud Detection
-              </button>
-            </div>
-
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
               <div className="lg:col-span-5 bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-4 shadow-xl">
                 <h3 className="text-sm font-black text-white uppercase tracking-wider border-b border-slate-800 pb-3">
@@ -1470,8 +1321,8 @@ export default function AdminDashboard() {
                 </h3>
                 <div className="space-y-2 max-h-[500px] overflow-y-auto pr-1">
                   {orders.map((ord, i) => {
-                    const custPhone = ord.phone || ord.Phone || "N/A";
-                    const isSelected = selectedCustomer?.phone === custPhone;
+                    const custPhone = ord.number || ord.phone || "N/A";
+                    const isSelected = selectedCustomer?.number === custPhone;
 
                     return (
                       <div
@@ -1488,7 +1339,7 @@ export default function AdminDashboard() {
                       >
                         <div>
                           <h4 className="text-sm font-bold text-white">
-                            {ord.name || ord.Name || "Customer"}
+                            {ord.name || "Customer"}
                           </h4>
                           <p className="text-xs text-slate-400 font-mono mt-0.5">
                             {custPhone}
@@ -1517,9 +1368,7 @@ export default function AdminDashboard() {
                           Customer Name
                         </p>
                         <h4 className="text-sm font-bold text-white mt-1">
-                          {selectedCustomer.name ||
-                            selectedCustomer.Name ||
-                            "N/A"}
+                          {selectedCustomer.name || "N/A"}
                         </h4>
                       </div>
                       <div>
@@ -1527,8 +1376,8 @@ export default function AdminDashboard() {
                           Phone Number
                         </p>
                         <h4 className="text-sm font-mono font-bold text-cyan-400 mt-1">
-                          {selectedCustomer.phone ||
-                            selectedCustomer.Phone ||
+                          {selectedCustomer.number ||
+                            selectedCustomer.phone ||
                             "N/A"}
                         </h4>
                       </div>
@@ -1537,9 +1386,7 @@ export default function AdminDashboard() {
                           Delivery Address
                         </p>
                         <p className="text-xs text-slate-300 mt-1">
-                          {selectedCustomer.address ||
-                            selectedCustomer.Address ||
-                            "N/A"}
+                          {selectedCustomer.address || "N/A"}
                         </p>
                       </div>
                     </div>
@@ -1548,25 +1395,24 @@ export default function AdminDashboard() {
                       <div className="bg-slate-950 border border-slate-800 p-8 rounded-2xl text-center">
                         <div className="w-8 h-8 mx-auto mb-2 border-2 border-rose-500/20 border-t-rose-500 rounded-full animate-spin"></div>
                         <p className="text-xs text-rose-400 font-bold">
-                          Steadfast API থেকে অটোমেটিক ফ্রড ও রিসিভ হিস্ট্রি চেক
-                          করা হচ্ছে...
+                          Steadfast API থেকে ফ্রড হিস্ট্রি চেক করা হচ্ছে...
                         </p>
                       </div>
                     ) : fraudReportMap[
-                        selectedCustomer.phone || selectedCustomer.Phone
+                        selectedCustomer.number || selectedCustomer.phone
                       ] ? (
                       <div className="bg-slate-950 border border-slate-800 p-6 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-6">
                         <div className="space-y-2">
                           <h4 className="text-xs font-bold uppercase tracking-wider text-amber-400">
-                            Steadfast Automated Courier Report
+                            Steadfast Courier Report
                           </h4>
                           <p className="text-xs text-slate-300">
                             মোট অর্ডার:{" "}
                             <span className="font-bold text-white">
                               {
                                 fraudReportMap[
-                                  selectedCustomer.phone ||
-                                    selectedCustomer.Phone
+                                  selectedCustomer.number ||
+                                    selectedCustomer.phone
                                 ].totalOrders
                               }{" "}
                               টি
@@ -1575,55 +1421,13 @@ export default function AdminDashboard() {
                             <span className="font-bold text-emerald-400">
                               {
                                 fraudReportMap[
-                                  selectedCustomer.phone ||
-                                    selectedCustomer.Phone
+                                  selectedCustomer.number ||
+                                    selectedCustomer.phone
                                 ].deliveredOrders
-                              }{" "}
-                              টি
-                            </span>{" "}
-                            | ক্যানসেল:{" "}
-                            <span className="font-bold text-rose-400">
-                              {
-                                fraudReportMap[
-                                  selectedCustomer.phone ||
-                                    selectedCustomer.Phone
-                                ].cancelledOrders
                               }{" "}
                               টি
                             </span>
                           </p>
-                          <p
-                            className={`text-xs font-bold ${
-                              Number(
-                                fraudReportMap[
-                                  selectedCustomer.phone ||
-                                    selectedCustomer.Phone
-                                ].successRate,
-                              ) >= 70
-                                ? "text-emerald-400"
-                                : "text-rose-500"
-                            }`}
-                          >
-                            স্ট্যাটাস:{" "}
-                            {
-                              fraudReportMap[
-                                selectedCustomer.phone || selectedCustomer.Phone
-                              ].riskLevel
-                            }
-                          </p>
-                        </div>
-                        <div className="w-20 h-20 rounded-full flex flex-col items-center justify-center border-4 border-emerald-500 bg-emerald-500/10 text-emerald-400 shrink-0">
-                          <span className="text-base font-black">
-                            {
-                              fraudReportMap[
-                                selectedCustomer.phone || selectedCustomer.Phone
-                              ].successRate
-                            }
-                            %
-                          </span>
-                          <span className="text-[9px] uppercase font-bold">
-                            Success
-                          </span>
                         </div>
                       </div>
                     ) : (
@@ -1631,12 +1435,12 @@ export default function AdminDashboard() {
                         <button
                           onClick={() =>
                             fetchAutomatedFraudData(
-                              selectedCustomer.phone || selectedCustomer.Phone,
+                              selectedCustomer.number || selectedCustomer.phone,
                             )
                           }
                           className="bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold px-5 py-2.5 rounded-xl cursor-pointer shadow-md"
                         >
-                          🔄 অটোমেটিক কুরিয়ার হিস্ট্রি ফেচ করুন
+                          🔄 অটোমেটিক কুরিয়ার হিস্ট্রি চেক করুন
                         </button>
                       </div>
                     )}
@@ -1654,21 +1458,14 @@ export default function AdminDashboard() {
         {/* MARKETING TAB */}
         {activeTab === "marketing" && (
           <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 md:p-8 space-y-6 shadow-xl">
-            <div className="border-b border-slate-800 pb-4">
-              <span className="text-xs font-bold uppercase tracking-wider text-amber-400 bg-amber-500/10 px-3 py-1 rounded-full border border-amber-500/20">
-                Marketing Control
-              </span>
-              <h3 className="text-lg font-black text-white mt-2">
-                📈 Marketing, Pixels & Server-Side Tracking (CAPI)
-              </h3>
-            </div>
-
+            <h3 className="text-lg font-black text-white">
+              📈 Marketing, Pixels & Server-Side Tracking (CAPI)
+            </h3>
             {pixelSaved && (
               <div className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 p-4 rounded-xl text-xs font-bold">
-                ✅ পিক্সেল ও ট্র্যাকিং কনফিগারেশন সফলভাবে সেভ হয়েছে!
+                ✅ কনফিগারেশন সেভ হয়েছে!
               </div>
             )}
-
             <form onSubmit={handleSavePixels} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
@@ -1689,7 +1486,7 @@ export default function AdminDashboard() {
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-300 uppercase mb-2">
-                    Meta CAPI Access Token
+                    Meta CAPI Token
                   </label>
                   <input
                     type="password"
@@ -1698,35 +1495,6 @@ export default function AdminDashboard() {
                       setPixelConfig({
                         ...pixelConfig,
                         metaAccessToken: e.target.value,
-                      })
-                    }
-                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-xs text-white font-mono focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-300 uppercase mb-2">
-                    GA4 Measurement ID
-                  </label>
-                  <input
-                    type="text"
-                    value={pixelConfig.ga4Id}
-                    onChange={(e) =>
-                      setPixelConfig({ ...pixelConfig, ga4Id: e.target.value })
-                    }
-                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-xs text-white font-mono focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-300 uppercase mb-2">
-                    TikTok Pixel ID
-                  </label>
-                  <input
-                    type="text"
-                    value={pixelConfig.tiktokPixelId}
-                    onChange={(e) =>
-                      setPixelConfig({
-                        ...pixelConfig,
-                        tiktokPixelId: e.target.value,
                       })
                     }
                     className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-xs text-white font-mono focus:outline-none"
@@ -1781,22 +1549,6 @@ export default function AdminDashboard() {
                 <Building2 className="text-cyan-400" size={30} />
               </div>
             </div>
-
-            <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl">
-              <h3 className="text-base font-black text-white mb-4">
-                💰 Settlements Ledger (Google Sheet Connected)
-              </h3>
-              <p className="text-xs text-slate-400">
-                সম্পূর্ণ রিকনসিলিয়েশন ও কুরিয়ার স্টেটমেন্ট দেখার জন্য{" "}
-                <Link
-                  href="/admin/settlements"
-                  className="text-emerald-400 underline font-bold"
-                >
-                  Dedicated Settlements Center
-                </Link>{" "}
-                পেজ ব্যবহার করুন।
-              </p>
-            </div>
           </div>
         )}
 
@@ -1838,33 +1590,9 @@ export default function AdminDashboard() {
               Financial Reports
             </h3>
             <p className="text-xs text-slate-400">
-              মাসিক বিক্রয়, রিটার্ন অনুপাত এবং লাভ-ক্ষতির পূর্ণাঙ্গ
-              অ্যানালিটিক্স রিপোর্ট।
+              সর্বমোট বিক্রয় এবং অর্ডারের ওপর ভিত্তি করে প্রস্তুতকৃত অটোমেটিক
+              রিপোর্ট।
             </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-              <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
-                <span className="text-xs font-bold text-slate-300">
-                  Sales & Revenue Report
-                </span>
-                <p className="text-[11px] text-slate-500 mt-1">
-                  সর্বমোট অর্ডারের ভিত্তিতে প্রস্তুতকৃত লাভ-ক্ষতি স্টেটমেন্ট।
-                </p>
-                <button className="mt-3 px-3 py-1.5 bg-slate-800 text-white rounded-lg text-xs font-semibold">
-                  Download CSV
-                </button>
-              </div>
-              <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
-                <span className="text-xs font-bold text-slate-300">
-                  Courier Delivery Performance
-                </span>
-                <p className="text-[11px] text-slate-500 mt-1">
-                  সফল ডেলিভারি ও রিটার্ন রেট পার্সেন্টেজ।
-                </p>
-                <button className="mt-3 px-3 py-1.5 bg-slate-800 text-white rounded-lg text-xs font-semibold">
-                  Download CSV
-                </button>
-              </div>
-            </div>
           </div>
         )}
 
@@ -1873,7 +1601,7 @@ export default function AdminDashboard() {
           <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-4 shadow-xl">
             <h3 className="text-base font-black text-white flex items-center gap-2 border-b border-slate-800 pb-3">
               <Shield className="text-emerald-400" size={18} /> 🔐 Staff &
-              Role-Based Access Control
+              Access Control
             </h3>
             <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 flex justify-between items-center">
               <div>
@@ -1895,19 +1623,15 @@ export default function AdminDashboard() {
         {activeTab === "cms" && (
           <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-4 shadow-xl">
             <h3 className="text-base font-black text-white flex items-center gap-2 border-b border-slate-800 pb-3">
-              <Globe className="text-cyan-400" size={18} /> 🌐 Website & Landing
-              Page CMS
+              <Globe className="text-cyan-400" size={18} /> 🌐 Website CMS
             </h3>
-            <p className="text-xs text-slate-400">
-              ব্যানার, নোটিস বার এবং অফার প্রমোশন টেক্সট নিয়ন্ত্রণ করুন।
-            </p>
             <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2">
               <label className="text-xs font-semibold text-slate-300">
                 Announcement Bar Text
               </label>
               <input
                 type="text"
-                defaultValue="🔥 সারা দেশে ফ্রি হোম ডেলিভারি! আজই অর্ডার করুন।"
+                defaultValue="🔥 সারা দেশে ক্যাশ অন হোম ডেলিভারি! আজই অর্ডার করুন।"
                 className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-xs text-white"
               />
             </div>
@@ -1923,9 +1647,9 @@ export default function AdminDashboard() {
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
-                <span className="text-xs text-slate-400">Google Sheets DB</span>
+                <span className="text-xs text-slate-400">Supabase DB</span>
                 <div className="text-sm font-bold text-emerald-400 mt-1">
-                  Connected (210ms)
+                  Connected (Realtime)
                 </div>
               </div>
               <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
@@ -1941,7 +1665,7 @@ export default function AdminDashboard() {
                   Clerk Authentication
                 </span>
                 <div className="text-sm font-bold text-emerald-400 mt-1">
-                  2FA Active
+                  Active
                 </div>
               </div>
             </div>
@@ -1952,18 +1676,11 @@ export default function AdminDashboard() {
         {activeTab === "settings" && (
           <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-4 shadow-xl">
             <h3 className="text-base font-black text-white flex items-center gap-2 border-b border-slate-800 pb-3">
-              <Settings className="text-amber-400" size={18} /> 🛠️ Business &
-              Store Settings
+              <Settings className="text-amber-400" size={18} /> 🛠️ Store
+              Settings
             </h3>
             <p className="text-xs text-slate-400">
-              পূর্ণাঙ্গ রুলস ইঞ্জিন ও ড্রাইভ ব্যাকআপ সেটিংসের জন্য{" "}
-              <Link
-                href="/admin/settings"
-                className="text-indigo-400 underline font-bold"
-              >
-                Module 13: System Control Center
-              </Link>{" "}
-              ব্যবহার করুন।
+              সিস্টেম কনফিগারেশন সক্রিয় রয়েছে।
             </p>
           </div>
         )}

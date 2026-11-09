@@ -2,29 +2,23 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import {
-  ShoppingCart,
-  Search,
-  RefreshCw,
-  Truck,
-  CheckCircle2,
-  Clock,
-  Filter,
-  AlertCircle,
-} from "lucide-react";
-import CustomerRiskBadge from "@/components/admin/CustomerRiskBadge"; // নতুন ইমপোর্ট
+import { ShoppingCart, Search, RefreshCw } from "lucide-react";
+import CustomerRiskBadge from "@/components/admin/CustomerRiskBadge";
 
 type Order = {
+  id?: number;
+  order_id?: string;
   orderId?: string;
-  Date?: string;
-  Time?: string;
+  date?: string;
+  time?: string;
   name?: string;
-  phone?: string;
+  number?: string;
   address?: string;
-  collectionAmount?: number;
+  collection_amount?: number;
+  tracking_id?: string;
   trackingCode?: string;
   status?: string;
-  courierAction?: string;
+  courier_action?: string;
 };
 
 export default function AdminOrdersPage() {
@@ -53,24 +47,30 @@ export default function AdminOrdersPage() {
     void fetchOrders();
   }, []);
 
-  const handleCourierBooking = async (order: Order, index: number) => {
-    const orderId = order.orderId || `ORD-${index + 1}`;
-    setBookingLoading(orderId);
+  const handleCourierBooking = async (order: Order) => {
+    // সঠিক order_id নিশ্চিত করা (ডাটাবেজের order_id অথবা fallback)
+    const targetId = String(order.order_id || order.orderId || "");
+    if (!targetId) {
+      alert("অর্ডার আইডি পাওয়া যায়নি!");
+      return;
+    }
 
-    const rawPhone = String(order.phone || "");
+    setBookingLoading(targetId);
+
+    const rawPhone = String(order.number || "");
     let formattedPhone = rawPhone.replace(/\D/g, "");
     if (formattedPhone.length === 10 && !formattedPhone.startsWith("0")) {
       formattedPhone = "0" + formattedPhone;
     }
 
-    const cleanAmount = Number(order.collectionAmount || 0);
+    const cleanAmount = Number(order.collection_amount || 0);
 
     try {
       const res = await fetch("/api/save-order", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          id: orderId,
+          id: targetId,
           name: order.name,
           phone: formattedPhone,
           address: order.address,
@@ -81,54 +81,49 @@ export default function AdminOrdersPage() {
       const result = await res.json();
       if (result.success) {
         alert(`সফল! কুরিয়ার ট্র্যাকিং আইডি (CN): ${result.consignmentId}`);
-        void fetchOrders();
+        await fetchOrders(); // ডাটা রিফ্রেশ করে UI সাথে সাথে আপডেট করা
       } else {
         alert(`বুকিং ব্যর্থ: ${result.error}`);
       }
-    } catch {
+    } catch (err) {
+      console.error("Courier booking error:", err);
       alert("কুরিয়ার বুকিং করার সময় সার্ভার ত্রুটি হয়েছে!");
     } finally {
       setBookingLoading(null);
     }
   };
 
-  const filteredOrders = orders
-    .filter((order) => {
-      const name = String(order.name || "").toLowerCase();
-      const phone = String(order.phone || "");
-      const orderId = String(order.orderId || "").toLowerCase();
-      const matchesSearch =
-        name.includes(searchTerm.toLowerCase()) ||
-        phone.includes(searchTerm) ||
-        orderId.includes(searchTerm.toLowerCase());
+  const filteredOrders = orders.filter((order) => {
+    const name = String(order.name || "").toLowerCase();
+    const phone = String(order.number || "");
+    const orderId = String(order.order_id || order.orderId || "").toLowerCase();
+    const matchesSearch =
+      name.includes(searchTerm.toLowerCase()) ||
+      phone.includes(searchTerm) ||
+      orderId.includes(searchTerm.toLowerCase());
 
-      if (statusFilter === "pending") {
-        return (
-          matchesSearch &&
-          (String(order.status || "").toLowerCase() === "pending" ||
-            !order.status)
-        );
-      }
-      if (statusFilter === "booked") {
-        return (
-          matchesSearch &&
-          (String(order.status || "").toLowerCase() === "booked" ||
-            String(order.status || "").toLowerCase() === "sent")
-        );
-      }
-      if (statusFilter === "delivered") {
-        return (
-          matchesSearch &&
-          (String(order.status || "").toLowerCase() === "delivered" ||
-            String(order.courierAction || "").toLowerCase() === "completed")
-        );
-      }
-      return matchesSearch;
-    })
-    .reverse();
+    const currentStatus = String(order.status || "pending").toLowerCase();
+
+    if (statusFilter === "pending") {
+      return matchesSearch && (currentStatus === "pending" || !order.status);
+    }
+    if (statusFilter === "booked") {
+      return (
+        matchesSearch &&
+        (currentStatus === "booked" || currentStatus === "sent")
+      );
+    }
+    if (statusFilter === "delivered") {
+      return (
+        matchesSearch &&
+        (currentStatus === "delivered" || currentStatus === "completed")
+      );
+    }
+    return matchesSearch;
+  });
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-6 max-w-7xl mx-auto font-sans">
       <div className="bg-slate-900 border border-slate-800 p-6 rounded-3xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 shadow-xl">
         <div>
           <span className="text-xs font-bold uppercase tracking-wider text-rose-400 bg-rose-500/10 px-3 py-1 rounded-full border border-rose-500/20">
@@ -139,7 +134,7 @@ export default function AdminOrdersPage() {
             Courier Processing Hub
           </h2>
           <p className="text-xs text-slate-400 mt-0.5">
-            গুগল শিট থেকে রিয়েল-টাইম সিঙ্ক হওয়া সমস্ত কাস্টমার অর্ডার এবং
+            সুপাবেজ থেকে রিয়েল-টাইম সিঙ্ক হওয়া সমস্ত কাস্টমার অর্ডার এবং
             Steadfast কুরিয়ার বুকিং ম্যানেজমেন্ট।
           </p>
         </div>
@@ -245,32 +240,37 @@ export default function AdminOrdersPage() {
               ) : (
                 filteredOrders.map((order, idx) => {
                   const cStatus = order.status || "Pending";
+                  const cStatusLower = cStatus.toLowerCase();
                   const isBooked =
-                    cStatus.toLowerCase() === "booked" ||
-                    cStatus.toLowerCase() === "sent" ||
-                    cStatus.toLowerCase() === "delivered";
-                  const orderIdentifier = order.orderId || `ORD-${idx + 1}`;
+                    cStatusLower === "booked" ||
+                    cStatusLower === "sent" ||
+                    cStatusLower === "delivered";
+                  const orderIdentifier =
+                    order.order_id || order.orderId || `ORD-${idx + 1}`;
+                  const trackingVal = order.tracking_id || order.trackingCode;
 
                   return (
-                    <tr key={idx} className="hover:bg-slate-800/50 transition">
+                    <tr
+                      key={order.id || idx}
+                      className="hover:bg-slate-800/50 transition"
+                    >
                       <td className="p-4 font-bold text-rose-500">
                         {orderIdentifier}
                       </td>
                       <td className="p-4 text-slate-400">
-                        {order.Date || "N/A"} <br />
+                        {order.date || "N/A"} <br />
                         <span className="text-[10px] text-slate-500">
-                          {order.Time || ""}
+                          {order.time || ""}
                         </span>
                       </td>
                       <td className="p-4 font-bold text-white">
                         {order.name || "Unknown"} <br />
                         <div className="flex items-center flex-wrap gap-1 mt-0.5">
                           <span className="text-[11px] text-cyan-400 font-mono font-normal">
-                            {order.phone || "No Number"}
+                            {order.number || "No Number"}
                           </span>
-                          {/* Steadfast ফ্রড ও সাকসেস রেট ব্যাজ */}
-                          {order.phone && (
-                            <CustomerRiskBadge phone={order.phone} />
+                          {order.number && (
+                            <CustomerRiskBadge phone={order.number} />
                           )}
                         </div>
                       </td>
@@ -278,11 +278,11 @@ export default function AdminOrdersPage() {
                         {order.address || "N/A"}
                       </td>
                       <td className="p-4 text-emerald-400 font-bold text-sm">
-                        ৳{order.collectionAmount || 0}
+                        ৳{order.collection_amount || 0}
                       </td>
                       <td className="p-4 font-mono text-cyan-400 font-bold">
-                        {order.trackingCode ? (
-                          order.trackingCode
+                        {trackingVal ? (
+                          trackingVal
                         ) : (
                           <span className="text-slate-500 font-normal">
                             Not Booked
@@ -302,7 +302,7 @@ export default function AdminOrdersPage() {
                       </td>
                       <td className="p-4 text-center">
                         <button
-                          onClick={() => void handleCourierBooking(order, idx)}
+                          onClick={() => void handleCourierBooking(order)}
                           disabled={
                             bookingLoading === orderIdentifier || isBooked
                           }

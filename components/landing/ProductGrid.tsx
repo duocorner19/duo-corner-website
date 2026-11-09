@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useState, useEffect, useTransition } from "react";
@@ -15,8 +16,6 @@ type ProductGridProps = {
 };
 
 export default function ProductGrid({
-  onDetails,
-  onOrder,
   searchQuery = "",
   selectedCategory = "",
 }: ProductGridProps) {
@@ -37,11 +36,13 @@ export default function ProductGrid({
       try {
         const res = await fetch("/api/products", { cache: "no-store" });
         const data = await res.json();
+
+        // যদি Supabase থেকে ডাটা সফলভাবে আসে
         if (isMounted && Array.isArray(data) && data.length > 0) {
           setProducts(data);
         }
       } catch (error) {
-        console.error("প্রোডাক্ট লোড করতে সমস্যা হয়েছে", error);
+        console.error("প্রোডাক্ট লোড করতে সমস্যা হয়েছে:", error);
       } finally {
         if (isMounted) {
           setInitialLoading(false);
@@ -65,7 +66,7 @@ export default function ProductGrid({
         startTransition(() => {
           setIsSearching(false);
         });
-      }, 700);
+      }, 500);
     } else {
       startTransition(() => {
         setIsSearching(false);
@@ -76,13 +77,14 @@ export default function ProductGrid({
     };
   }, [searchQuery]);
 
+  // ফিল্টারিং লজিক (যাতে যেকোনো প্রপার্টি নেম ম্যাচ করলেই প্রোডাক্ট দেখায়)
   const filteredProducts = products.filter((product) => {
     const pAny = product as Record<string, unknown>;
     const prodName = String(
-      product.name || pAny.productName || pAny["Product Name"] || "",
+      pAny["Product Name"] || pAny.productName || pAny.name || "",
     );
-    const prodDesc = String(product.description || pAny.Description || "");
-    const prodCat = String(pAny.category || pAny["Category"] || "");
+    const prodDesc = String(pAny["Description"] || pAny.description || "");
+    const prodCat = String(pAny["Category"] || pAny.category || "");
 
     const matchesSearch =
       prodName.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -116,31 +118,21 @@ export default function ProductGrid({
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
         {filteredProducts.map((product, index) => {
           const pAny = product as Record<string, unknown>;
-          const prodId = product.id || index + 1;
+          const prodId = pAny.id || pAny.product_id || index + 1;
           const prodName = String(
-            product.name ||
-              pAny.productName ||
-              pAny["Product Name"] ||
-              "Product",
+            pAny["Product Name"] || pAny.productName || pAny.name || "Product",
           );
 
           const rawSlug = String(
-            pAny.slug ||
-              product.slug ||
-              prodId ||
-              prodName.toLowerCase().replace(/\s+/g, "-"),
+            pAny.slug || prodId || prodName.toLowerCase().replace(/\s+/g, "-"),
           );
           const productUrl = `/product/${encodeURIComponent(rawSlug)}`;
 
           const regularPrice = Number(
-            pAny.regularPrice || pAny["Regular Price"] || 999,
+            pAny["Regular Price"] || pAny.regularPrice || 999,
           );
           const offerPrice = Number(
-            pAny.offerPrice ||
-              pAny["Offer Price"] ||
-              product.basePrice ||
-              pAny.price ||
-              799,
+            pAny["Offer Price"] || pAny.offerPrice || pAny.basePrice || 799,
           );
           const discountPercent =
             regularPrice > offerPrice
@@ -148,18 +140,20 @@ export default function ProductGrid({
               : 0;
 
           const prodCategory = String(
-            pAny.category || pAny["Category"] || "Couple Item",
+            pAny["Category"] || pAny.category || "Couple Item",
           );
 
+          // ইমেজ হ্যান্ডলিং (Supabase টেবিলের Image URL1 অথবা অ্যারে সাপোর্ট)
           let prodImage = "/parl.jpg";
-          const colImg = pAny["Image URL1"] || pAny.imageUrl1 || pAny.image;
+          const colImg =
+            pAny["Image URL1"] || pAny.image_url_1 || pAny.imageUrl1;
 
           if (
-            Array.isArray(product.images) &&
-            product.images.length > 0 &&
-            product.images[0]
+            Array.isArray(pAny.images) &&
+            pAny.images.length > 0 &&
+            pAny.images[0]
           ) {
-            prodImage = product.images[0];
+            prodImage = pAny.images[0] as string;
           } else if (
             colImg &&
             typeof colImg === "string" &&
@@ -170,14 +164,9 @@ export default function ProductGrid({
               : "/" + colImg.replace(/^\/+/, "");
           }
 
-          if (pAny["Image URL1"]) {
-            const imgVal = String(pAny["Image URL1"]).trim();
-            prodImage = imgVal.startsWith("/") ? imgVal : "/" + imgVal;
-          }
-
           return (
             <div
-              key={prodId}
+              key={String(prodId)}
               className="bg-white rounded-2xl shadow-sm border border-rose-100 overflow-hidden flex flex-col group hover:shadow-md transition-all duration-300"
             >
               <Link
@@ -262,36 +251,13 @@ export default function ProductGrid({
       </div>
 
       {filteredProducts.length === 0 && (
-        <div className="min-h-[60vh] flex flex-col items-center justify-center text-center px-4 py-16 space-y-6">
-          <div className="relative w-full max-w-sm aspect-video rounded-3xl overflow-hidden bg-gradient-to-br from-slate-950 via-slate-900 to-black border border-amber-500/40 shadow-2xl flex flex-col items-center justify-center p-6">
-            <video
-              autoPlay
-              loop
-              muted
-              playsInline
-              className="absolute inset-0 w-full h-full object-cover opacity-40 mix-blend-overlay pointer-events-none"
-            >
-              <source src="/couple-sorry.mp4" type="video/mp4" />
-            </video>
-
-            <div className="relative z-10 flex flex-col items-center space-y-3">
-              <span className="text-3xl animate-bounce">👩‍❤️‍👨</span>
-              <div className="bg-gradient-to-r from-rose-600 to-orange-500 text-white text-[11px] font-black px-4 py-1 rounded-full shadow-lg tracking-wider uppercase animate-pulse">
-                Sorry 😞
-              </div>
-            </div>
+        <div className="min-h-[50vh] flex flex-col items-center justify-center text-center px-4 py-16 space-y-4">
+          <div className="bg-gradient-to-r from-rose-600 to-orange-500 text-white text-xs font-black px-4 py-2 rounded-full shadow-lg">
+            কোনো পণ্য পাওয়া যায়নি!
           </div>
-
-          <div className="space-y-2 max-w-md">
-            <h3 className="text-base sm:text-lg font-black text-gray-800 tracking-wide">
-              এমন ফলাফল পাওয়া যায়নি
-            </h3>
-            <p className="text-xs text-gray-500 leading-relaxed">
-              আপনার সার্চ করা নাম বা কিওয়ার্ড দিয়ে আমাদের স্টোরে এই মুহূর্তে
-              কোনো পণ্য পাওয়া যায়নি। অনুগ্রহ করে সঠিক বানানে বা অন্য কিছু
-              দিয়ে আবার সার্চ করুন।
-            </p>
-          </div>
+          <p className="text-xs text-gray-500">
+            এই মুহূর্তে এই ক্যাটাগরিতে বা সার্চ রেজাল্টে কোনো প্রোডাক্ট নেই।
+          </p>
         </div>
       )}
     </section>

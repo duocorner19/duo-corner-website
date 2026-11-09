@@ -1,35 +1,48 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextResponse } from "next/server";
-
-const GOOGLE_SHEET_URL =
-  process.env.GOOGLE_SHEET_URL ||
-  "আপনার_গুগল_শিট_এক্সিকিউটেবল_লিংকটি_এখানে_দিন";
+import { supabase } from "@/lib/supabase"; // Supabase ক্লায়েন্ট ইমপোর্ট
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
 
-    // body-তে orderId, trackingCode, status থাকতে হবে
-    const response = await fetch(GOOGLE_SHEET_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        action: "update_order_status",
-        ...body,
-      }),
-      cache: "no-store",
-    });
+    // বডি থেকে প্রয়োজনীয় ফিল্ডগুলো সংগ্রহ করা
+    const targetOrderId = String(
+      body.orderId || body.order_id || body.id || "",
+    );
+    const trackingCode = body.trackingCode || body.tracking_id || null;
+    const status = body.status || null;
+    const courierAction = body.courierAction || body.courier_action || null;
 
-    if (!response.ok) {
-      throw new Error("Google Sheet order update failed");
+    if (!targetOrderId) {
+      return NextResponse.json(
+        { success: false, error: "Order ID is required" },
+        { status: 400 },
+      );
     }
 
-    const result = await response.json().catch(() => ({ status: "success" }));
-    return NextResponse.json({ success: true, result });
+    // আপডেটের জন্য অবজেক্ট তৈরি
+    const updateData: Record<string, any> = {};
+    if (status) updateData.status = status;
+    if (trackingCode) updateData.tracking_id = trackingCode;
+    if (courierAction) updateData.courier_action = courierAction;
+
+    // Supabase-এর orders টেবিলে ডেটা আপডেট করা
+    const { data, error } = await supabase
+      .from("orders")
+      .update(updateData)
+      .eq("order_id", targetOrderId)
+      .select();
+
+    if (error) {
+      throw error;
+    }
+
+    return NextResponse.json({ success: true, result: data });
   } catch (error: any) {
     console.error("Order Update API error:", error);
     return NextResponse.json(
-      { success: false, error: error.toString() },
+      { success: false, error: error.message || error.toString() },
       { status: 500 },
     );
   }

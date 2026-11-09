@@ -1,21 +1,20 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextResponse } from "next/server";
 import crypto from "crypto";
-import { supabase } from "@/lib/supabase"; // Supabase ক্লায়েন্ট ইমপোর্ট করা হলো
+import { supabase } from "@/lib/supabase";
 
-// ১. GET: Supabase থেকে রিয়েল-টাইম অর্ডার ফেচ করা (গুগল শিটের বদলে)
+// ১. GET: Supabase থেকে রিয়েল-টাইম অর্ডার ফেচ করা
 export async function GET() {
   try {
     const { data, error } = await supabase
       .from("orders")
       .select("*")
-      .order("created_at", { ascending: false });
+      .order("id", { ascending: false });
 
-    if (error) {
-      throw error;
-    }
+    if (error) throw error;
 
     return NextResponse.json(Array.isArray(data) ? data : []);
-  } catch (error) {
+  } catch (error: any) {
     console.error("Orders API GET error:", error);
     return NextResponse.json([], { status: 500 });
   }
@@ -26,16 +25,66 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
 
-    const targetOrderId =
-      body.order_id || body.orderId || `ORD-${Date.now().toString().slice(-6)}`;
-    const customerName =
-      body.name || body.customer_name || body.fullName || "Valued Customer";
-    const customerPhone = String(body.number || body.phone || "");
-    const customerAddress = body.address || "";
-    const totalAmount = Number(
-      body.collection_amount || body.total || body.collectionAmount || 0,
+    // কাস্টমারের নাম
+    const customerName = String(
+      body.fullName || body.name || body.customer_name || "Valued Customer",
+    ).trim();
+
+    // কাস্টমারের ফোন নম্বর ফরম্যাটিং
+    let customerPhone = String(
+      body.phone || body.number || body.customerPhone || "",
+    ).trim();
+    customerPhone = customerPhone.replace(/\D/g, "");
+    if (customerPhone.length === 10 && !customerPhone.startsWith("0")) {
+      customerPhone = "0" + customerPhone;
+    }
+
+    if (!customerPhone) {
+      return NextResponse.json(
+        { status: "error", message: "ফোন নম্বর আবশ্যক।" },
+        { status: 400 },
+      );
+    }
+
+    // অর্ডার আইডি তৈরি (Unique Order ID)
+    const targetOrderId = String(
+      body.order_id || body.orderId || `ORD-${Date.now().toString().slice(-6)}`,
     );
 
+    // সম্পূর্ণ ঠিকানা একত্রীকরণ (রোড + থানা + জেলা + বিভাগ + নোট)
+    const rawAddress = String(
+      body.address || body.customerAddress || "",
+    ).trim();
+    const thana = String(body.selectedThana || body.thana || "").trim();
+    const district = String(
+      body.selectedDistrict || body.district || "",
+    ).trim();
+    const division = String(
+      body.selectedDivision || body.division || "",
+    ).trim();
+    const specialNote = String(body.specialNote || body.note || "").trim();
+
+    const addressParts: string[] = [];
+    if (rawAddress) addressParts.push(rawAddress);
+    if (thana) addressParts.push(`থানা: ${thana}`);
+    if (district) addressParts.push(`জেলা: ${district}`);
+    if (division) addressParts.push(`বিভাগ: ${division}`);
+    if (specialNote) addressParts.push(`(নোট: ${specialNote})`);
+
+    const fullAddress =
+      addressParts.length > 0 ? addressParts.join(", ") : rawAddress;
+
+    // কালেকশন অ্যামাউন্ট (Total)
+    const totalAmount = Number(
+      body.total ||
+        body.collection_amount ||
+        body.totalPrice ||
+        body.amount ||
+        body.collectionAmount ||
+        0,
+    );
+
+    // Supabase-এর orders টেবিলে ডেটা ইনসার্ট
     const { data, error } = await supabase
       .from("orders")
       .insert([
@@ -43,35 +92,40 @@ export async function POST(request: Request) {
           order_id: targetOrderId,
           name: customerName,
           number: customerPhone,
-          address: customerAddress,
+          address: fullAddress,
           collection_amount: totalAmount,
           tracking_id: body.tracking_id || "",
           status: body.status || "pending",
           courier_action: body.courier_action || "",
-          utm_source: body.utm_source || "",
-          utm_campaign: body.utm_campaign || "",
+          utm_source: body.utm_source || body.utmSource || "Direct",
+          utm_campaign: body.utm_campaign || body.utmCampaign || "",
         },
       ])
       .select();
 
     if (error) {
+      console.error("Supabase Database Insert Error:", error);
       throw error;
     }
 
-    return NextResponse.json({ status: "success", data });
-  } catch (error: unknown) {
+    return NextResponse.json({
+      status: "success",
+      orderId: targetOrderId,
+      data: data?.[0] || null,
+    });
+  } catch (error: any) {
     console.error("Orders API POST error:", error);
     return NextResponse.json(
       {
         status: "error",
-        message: error instanceof Error ? error.message : "Order save failed",
+        message: error?.message || "Order save failed",
       },
       { status: 500 },
     );
   }
 }
 
-// ৩. PUT: Steadfast কুরিয়ারে অর্ডার পাঠানো এবং সফল বুকিং হওয়ার পরেই মেটা CAPI Purchase ইভেন্ট ফায়ার করা
+// ৩. PUT: Steadfast কুরিয়ারে অর্ডার পাঠানো এবং বুকিং সফল হলে মেটা CAPI Purchase ফায়ার করা
 export async function PUT(request: Request) {
   try {
     const body = await request.json();
@@ -80,7 +134,7 @@ export async function PUT(request: Request) {
     const SECRET_KEY = "9clfsi0vrhrbzwupeojrymau";
 
     const targetOrderId = String(
-      body.id || body.orderId || body.order_id || "DC-1",
+      body.id || body.orderId || body.order_id || "",
     );
     const targetPhone = String(
       body.phone || body.customerPhone || body.number || "",
@@ -93,6 +147,13 @@ export async function PUT(request: Request) {
         body.collection_amount ||
         0,
     );
+
+    if (!targetOrderId) {
+      return NextResponse.json(
+        { success: false, error: "Order ID is missing for booking!" },
+        { status: 400 },
+      );
+    }
 
     const payload = {
       invoice: targetOrderId,
@@ -124,24 +185,37 @@ export async function PUT(request: Request) {
         result.success === true)
     ) {
       const consignmentId = String(
-        result.consignment?.consignment_id || result.consignment_id || "1",
+        result.consignment?.consignment_id || result.consignment_id || "",
       );
 
-      // ক. কুরিয়ারে বুকিং সফল হওয়ার পর Supabase-এ স্ট্যাটাস ও ট্র্যাকিং আইডি আপডেট
+      // Supabase-এ সঠিকভাবে স্ট্যাটাস ও ট্র্যাকিং আইডি আপডেট করা
       try {
-        await supabase
+        let updateRes = await supabase
           .from("orders")
           .update({
             status: "Booked",
             tracking_id: consignmentId,
             courier_action: "Steadfast Booked",
           })
-          .eq("order_id", targetOrderId);
+          .eq("order_id", targetOrderId)
+          .select();
+
+        // যদি order_id দিয়ে রো না পাওয়া যায়, তবে id (primary key) দিয়ে চেষ্টা করা হবে
+        if (!updateRes.data || updateRes.data.length === 0) {
+          await supabase
+            .from("orders")
+            .update({
+              status: "Booked",
+              tracking_id: consignmentId,
+              courier_action: "Steadfast Booked",
+            })
+            .eq("id", targetOrderId);
+        }
       } catch (dbErr) {
         console.error("Supabase status update error:", dbErr);
       }
 
-      // খ. শুধুমাত্র কনফার্মড বুকিং হওয়ার পরেই ফেসবুক Conversion API (CAPI) এর মাধ্যমে Purchase ইভেন্ট পাঠানো
+      // মেটা CAPI Purchase ইভেন্ট ট্রিগার
       const clientIp =
         request.headers.get("x-forwarded-for")?.split(",")[0].trim() ||
         "127.0.0.1";
@@ -171,7 +245,7 @@ export async function PUT(request: Request) {
         { status: 400 },
       );
     }
-  } catch (error: unknown) {
+  } catch (error: any) {
     console.error("Steadfast API proxy error:", error);
     return NextResponse.json(
       {
@@ -184,7 +258,7 @@ export async function PUT(request: Request) {
 }
 
 // ----------------------------------------------------
-// ফেসবুক Conversion API (CAPI) হেল্পার ফাংশন (SHA-256 এনক্রিপশন সহ)
+// ফেসবুক Conversion API (CAPI) হেল্পার ফাংশন (SHA-256 Hashing)
 // ----------------------------------------------------
 function hashData(value: string | number | undefined | null) {
   if (!value) return undefined;
@@ -207,10 +281,7 @@ async function sendMetaCAPI({
   const PIXEL_ID = process.env.NEXT_PUBLIC_FB_PIXEL_ID;
   const ACCESS_TOKEN = process.env.FB_ACCESS_TOKEN;
 
-  if (!PIXEL_ID || !ACCESS_TOKEN) {
-    console.log("Meta CAPI skipped: Pixel ID or Access Token is missing.");
-    return;
-  }
+  if (!PIXEL_ID || !ACCESS_TOKEN) return;
 
   try {
     await fetch(
