@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import crypto from "crypto";
 import { supabase } from "@/lib/supabase";
 
-// ১. GET: Supabase থেকে রিয়েল-টাইম অর্ডার ফেচ করা
+// ১. GET: Supabase থেকে সমস্ত অর্ডার ফেচ করা (সর্বশেষ অর্ডার সবার উপরে থাকবে)
 export async function GET() {
   try {
     const { data, error } = await supabase
@@ -25,33 +25,29 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
 
-    // কাস্টমারের নাম
     const customerName = String(
-      body.fullName || body.name || body.customer_name || "Valued Customer",
+      body.name || body.fullName || body.customer_name || "Valued Customer",
     ).trim();
 
-    // কাস্টমারের ফোন নম্বর ফরম্যাটিং
     let customerPhone = String(
-      body.phone || body.number || body.customerPhone || "",
+      body.number || body.phone || body.customerPhone || "",
     ).trim();
     customerPhone = customerPhone.replace(/\D/g, "");
     if (customerPhone.length === 10 && !customerPhone.startsWith("0")) {
       customerPhone = "0" + customerPhone;
     }
 
-    if (!customerPhone) {
+    if (!customerPhone || !customerName) {
       return NextResponse.json(
-        { status: "error", message: "ফোন নম্বর আবশ্যক।" },
+        { status: "error", message: "নাম এবং সঠিক ফোন নম্বর আবশ্যক।" },
         { status: 400 },
       );
     }
 
-    // অর্ডার আইডি তৈরি (Unique Order ID)
     const targetOrderId = String(
       body.order_id || body.orderId || `ORD-${Date.now().toString().slice(-6)}`,
     );
 
-    // সম্পূর্ণ ঠিকানা একত্রীকরণ (রোড + থানা + জেলা + বিভাগ + নোট)
     const rawAddress = String(
       body.address || body.customerAddress || "",
     ).trim();
@@ -72,19 +68,16 @@ export async function POST(request: Request) {
     if (specialNote) addressParts.push(`(নোট: ${specialNote})`);
 
     const fullAddress =
-      addressParts.length > 0 ? addressParts.join(", ") : rawAddress;
+      addressParts.length > 0 ? addressParts.join(", ") : rawAddress || "N/A";
 
-    // কালেকশন অ্যামাউন্ট (Total)
     const totalAmount = Number(
-      body.total ||
-        body.collection_amount ||
+      body.collection_amount ||
+        body.total ||
         body.totalPrice ||
         body.amount ||
-        body.collectionAmount ||
         0,
     );
 
-    // Supabase-এর orders টেবিলে ডেটা ইনসার্ট
     const { data, error } = await supabase
       .from("orders")
       .insert([
@@ -125,7 +118,7 @@ export async function POST(request: Request) {
   }
 }
 
-// ৩. PUT: Steadfast কুরিয়ারে অর্ডার পাঠানো এবং বুকিং সফল হলে মেটা CAPI Purchase ফায়ার করা
+// ৩. PUT: Steadfast কুরিয়ারে অর্ডার পাঠানো এবং বুকিং সফল হলে ডাটাবেজে আপডেট করা
 export async function PUT(request: Request) {
   try {
     const body = await request.json();
@@ -136,17 +129,9 @@ export async function PUT(request: Request) {
     const targetOrderId = String(
       body.id || body.orderId || body.order_id || "",
     );
-    const targetPhone = String(
-      body.phone || body.customerPhone || body.number || "",
-    );
-    const customerName = body.name || body.customerName || "Valued Customer";
-    const totalAmount = Number(
-      body.totalPrice ||
-        body.collectionAmount ||
-        body.amount ||
-        body.collection_amount ||
-        0,
-    );
+    const targetPhone = String(body.phone || body.number || "");
+    const customerName = body.name || "Valued Customer";
+    const totalAmount = Number(body.totalPrice || body.collection_amount || 0);
 
     if (!targetOrderId) {
       return NextResponse.json(
@@ -159,7 +144,7 @@ export async function PUT(request: Request) {
       invoice: targetOrderId,
       recipient_name: customerName,
       recipient_phone: targetPhone,
-      recipient_address: body.address || body.customerAddress || "Dhaka",
+      recipient_address: body.address || "Dhaka",
       cod_amount: totalAmount,
     };
 
@@ -188,34 +173,24 @@ export async function PUT(request: Request) {
         result.consignment?.consignment_id || result.consignment_id || "",
       );
 
-      // Supabase-এ সঠিকভাবে স্ট্যাটাস ও ট্র্যাকিং আইডি আপডেট করা
+      // অত্যন্ত নিখুঁত আপডেট লজিক: order_id দিয়ে সরাসরি আপডেট করা
       try {
-        let updateRes = await supabase
+        const { error: dbError } = await supabase
           .from("orders")
           .update({
             status: "Booked",
             tracking_id: consignmentId,
             courier_action: "Steadfast Booked",
           })
-          .eq("order_id", targetOrderId)
-          .select();
+          .eq("order_id", targetOrderId);
 
-        // যদি order_id দিয়ে রো না পাওয়া যায়, তবে id (primary key) দিয়ে চেষ্টা করা হবে
-        if (!updateRes.data || updateRes.data.length === 0) {
-          await supabase
-            .from("orders")
-            .update({
-              status: "Booked",
-              tracking_id: consignmentId,
-              courier_action: "Steadfast Booked",
-            })
-            .eq("id", targetOrderId);
+        if (dbError) {
+          console.error("Supabase status update error:", dbError);
         }
       } catch (dbErr) {
-        console.error("Supabase status update error:", dbErr);
+        console.error("Supabase status update exception:", dbErr);
       }
 
-      // মেটা CAPI Purchase ইভেন্ট ট্রিগার
       const clientIp =
         request.headers.get("x-forwarded-for")?.split(",")[0].trim() ||
         "127.0.0.1";
@@ -258,7 +233,7 @@ export async function PUT(request: Request) {
 }
 
 // ----------------------------------------------------
-// ফেসবুক Conversion API (CAPI) হেল্পার ফাংশন (SHA-256 Hashing)
+// ফেসবুক Conversion API (CAPI) হেল্পার ফাংশন
 // ----------------------------------------------------
 function hashData(value: string | number | undefined | null) {
   if (!value) return undefined;

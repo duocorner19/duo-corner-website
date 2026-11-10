@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useState, useEffect } from "react";
@@ -111,7 +112,6 @@ export default function ProductDetail({ product, onBack }: ProductDetailProps) {
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
 
-  // ৬৪ জেলার তালিকা প্রস্তুত করা
   const districtEntries = Object.entries(divisionData).flatMap(
     ([division, districtMap]) =>
       Object.keys(districtMap).map((district) => ({
@@ -152,7 +152,6 @@ export default function ProductDetail({ product, onBack }: ProductDetailProps) {
     setSelectedDistrict(e.target.value);
   };
 
-  // ঢাকা হলে ১০০ টাকা, অন্যথায় ১৪০ টাকা
   const deliveryCharge = selectedDistrict === "ঢাকা" ? 100 : 140;
   const subtotal = offerPrice * quantity;
   const total = subtotal + deliveryCharge;
@@ -211,7 +210,6 @@ export default function ProductDetail({ product, onBack }: ProductDetailProps) {
         }
       }
 
-      // Supabase API-তে অর্ডার পাঠানো
       const res = await fetch("/api/save-order", {
         method: "POST",
         headers: {
@@ -267,7 +265,9 @@ export default function ProductDetail({ product, onBack }: ProductDetailProps) {
         fullName={fullName}
         productName={productName}
         total={total}
-        onBack={onBack}
+        onBack={() => {
+          window.location.href = "/";
+        }}
       />
     );
   }
@@ -279,6 +279,7 @@ export default function ProductDetail({ product, onBack }: ProductDetailProps) {
         onClick={() => {
           window.scrollTo({ top: 0, left: 0, behavior: "instant" });
           onBack();
+          window.location.href = "/";
         }}
         className="mb-4 inline-flex items-center gap-2 bg-white hover:bg-gray-50 text-gray-700 font-semibold px-4 py-2 rounded-xl shadow-sm border border-gray-200 text-xs transition cursor-pointer"
       >

@@ -7,30 +7,18 @@ function imageValue(value: unknown): string {
 }
 
 function normalizeProduct(product: any) {
+  // আপনার সুপাবেসের নিখুঁত ৪টি ইমেজ কলাম থেকে ইমেজ সংগ্রহ
   const imageColumns = [
     product?.["Image URL1"],
     product?.["Image URL2"],
     product?.["Image URL3"],
     product?.["Image URL4"],
-    product?.image_url_1,
-    product?.image_url_2,
-    product?.image_url_3,
-    product?.image_url_4,
   ];
 
   let images = imageColumns.map(imageValue).filter(Boolean);
 
   if (images.length === 0) {
-    const oldValue =
-      product?.images ??
-      product?.image ??
-      product?.["Image URL"] ??
-      product?.imageUrl ??
-      "";
-    images = (Array.isArray(oldValue) ? oldValue : String(oldValue).split(","))
-      .flatMap((item: unknown) => String(item ?? "").split(","))
-      .map(imageValue)
-      .filter(Boolean);
+    images = ["/parl.jpg"];
   }
 
   images = images.map((image) =>
@@ -40,18 +28,30 @@ function normalizeProduct(product: any) {
   return {
     ...product,
     id: product.id ?? product.product_id,
-    productName:
-      product["Product Name"] ?? product.product_name ?? product.productName,
-    regularPrice: Number(
-      product["Regular Price"] ?? product.regular_price ?? 0,
-    ),
-    offerPrice: Number(product["Offer Price"] ?? product.offer_price ?? 0),
-    category: product["Category"] ?? product.category ?? "Couple Item",
-    description: product["Description"] ?? product.description ?? "",
-    stock: product["Stock"] ?? product.stock ?? 10,
+    productName: product["Product Name"] || "Product",
+    regularPrice: Number(product["Regular Price"] || 0),
+    offerPrice: Number(product["Offer Price"] || 0),
+    category: product["Category"] || "Couple Item",
+    description: product["Description"] || "",
+    stock: Number(product["Stock"] || 0),
     images,
     image: images[0] ?? "/parl.jpg",
     imageUrl: images[0] ?? "/parl.jpg",
+    // অতিরিক্ত প্রপার্টিগুলো ম্যাপিং করা হলো যাতে কোনো ডাটা মিসিং না হয়
+    videoUrl: product["Video URL"] || "",
+    productSpecifications: product["⚡ PRODUCT SPECIFICATIONS"] || "",
+    productType: product["product type"] || "",
+    usableGender: product["usable gender"] || "Unisex",
+    material: product["Material"] || "",
+    color: product["Color"] || "",
+    singlePackageSize: product["Single package size"] || "",
+    singleGrossWeight: product["Single gross weight"] || "",
+    value1: product["Value 1"] || "",
+    value2: product["Value 2"] || "",
+    value3: product["Value 3"] || "",
+    value4: product["Value 4"] || "",
+    value5: product["Value 5"] || "",
+    value6: product["Value 6"] || "",
   };
 }
 
@@ -61,46 +61,34 @@ export async function POST(request: Request) {
     const body = await request.json();
 
     const payload = {
-      "Product Name":
-        body["Product Name"] || body.product_name || body.productName || "",
-      "Regular Price": Number(
-        body["Regular Price"] ||
-          body.regular_price ||
-          body.regularPrice ||
-          body.price ||
-          0,
-      ),
+      "Product Name": body["Product Name"] || body.productName || "",
+      "Regular Price": Number(body["Regular Price"] || body.regularPrice || 0),
       "Offer Price":
-        body["Offer Price"] || body.offer_price || body.offerPrice
-          ? Number(body["Offer Price"] || body.offer_price || body.offerPrice)
-          : null,
+        body["Offer Price"] !== undefined ? Number(body["Offer Price"]) : null,
       Category: body["Category"] || body.category || "",
       Stock: Number(body["Stock"] || body.stock || 0),
       Description: body["Description"] || body.description || null,
-      "Image URL1":
-        body["Image URL1"] || body.image_url_1 || body.imageUrl1 || "",
-      "Image URL2":
-        body["Image URL2"] || body.image_url_2 || body.imageUrl2 || null,
-      "Image URL3":
-        body["Image URL3"] || body.image_url_3 || body.imageUrl3 || null,
-      "Image URL4":
-        body["Image URL4"] || body.image_url_4 || body.imageUrl4 || null,
-      "Video URL": body["Video URL"] || body.video_url || body.videoUrl || null,
-      "⚡ PRODUCT SPECIFICATIONS": body["⚡ PRODUCT SPECIFICATIONS"] || null,
-      "product type": body["product type"] || body.product_type || null,
-      "Value 1": body["Value 1"] || null,
-      "usable gender": body["usable gender"] || body.usable_gender || "Unisex",
-      "Value 2": body["Value 2"] || null,
+      "Image URL1": body["Image URL1"] || body.imageUrl1 || "",
+      "Image URL2": body["Image URL2"] || body.imageUrl2 || null,
+      "Image URL3": body["Image URL3"] || body.imageUrl3 || null,
+      "Image URL4": body["Image URL4"] || body.imageUrl4 || null,
+      "Video URL": body["Video URL"] || body.videoUrl || null,
+      "⚡ PRODUCT SPECIFICATIONS":
+        body["⚡ PRODUCT SPECIFICATIONS"] || body.productSpecifications || null,
+      "product type": body["product type"] || body.productType || null,
+      "Value 1": body["Value 1"] || body.value1 || null,
+      "usable gender": body["usable gender"] || body.usableGender || "Unisex",
+      "Value 2": body["Value 2"] || body.value2 || null,
       Material: body["Material"] || body.material || null,
-      "Value 3": body["Value 3"] || null,
+      "Value 3": body["Value 3"] || body.value3 || null,
       Color: body["Color"] || body.color || null,
-      "Value 4": body["Value 4"] || null,
+      "Value 4": body["Value 4"] || body.value4 || null,
       "Single package size":
-        body["Single package size"] || body.package_size || null,
-      "Value 5": body["Value 5"] || null,
+        body["Single package size"] || body.singlePackageSize || null,
+      "Value 5": body["Value 5"] || body.value5 || null,
       "Single gross weight":
-        body["Single gross weight"] || body.gross_weight || null,
-      "Value 6": body["Value 6"] || null,
+        body["Single gross weight"] || body.singleGrossWeight || null,
+      "Value 6": body["Value 6"] || body.value6 || null,
     };
 
     const { data, error } = await supabase

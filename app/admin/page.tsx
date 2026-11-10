@@ -85,23 +85,17 @@ export default function AdminDashboard() {
     | "impact"
   >("overview");
 
-  const [customerSubTab, setCustomerSubTab] = useState<
-    "profiles" | "fraud" | "verification" | "queue" | "watchlist"
-  >("profiles");
-
   const [searchTerm, setSearchTerm] = useState("");
   const [products, setProducts] = useState<any[]>([]);
   const [productSearch, setProductSearch] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Automated Fraud Checker & Customer 360 States
   const [selectedCustomer, setSelectedCustomer] = useState<any | null>(null);
   const [autoFraudLoading, setAutoFraudLoading] = useState(false);
   const [fraudReportMap, setFraudReportMap] = useState<{
     [phone: string]: any;
   }>({});
 
-  // Automation Rules States
   const [rules, setRules] = useState([
     {
       id: 1,
@@ -123,7 +117,6 @@ export default function AdminDashboard() {
     },
   ]);
 
-  // ক্যাটাগরি স্টেট
   const [categories, setCategories] = useState<string[]>([
     "ব্রেসলেট (Bracelet)",
     "নেকলেস (Necklace)",
@@ -133,7 +126,6 @@ export default function AdminDashboard() {
   const [newCategoryName, setNewCategoryName] = useState("");
   const [categoryLoading, setCategoryLoading] = useState(false);
 
-  // নতুন প্রোডাক্ট স্টেট (Supabase স্কিমার সাথে সিঙ্কড)
   const [productForm, setProductForm] = useState({
     productName: "",
     category: "ব্রেসলেট (Bracelet)",
@@ -154,7 +146,6 @@ export default function AdminDashboard() {
     grossWeight: "50g",
   });
 
-  // Marketing & Pixels Hub State
   const [pixelConfig, setPixelConfig] = useState({
     metaPixelId: "123456789012345",
     metaAccessToken: "EAAG...",
@@ -167,7 +158,6 @@ export default function AdminDashboard() {
   });
   const [pixelSaved, setPixelSaved] = useState(false);
 
-  // ডাটা ফেচিং ফাংশন
   const fetchOrders = async () => {
     try {
       const res = await fetch("/api/save-order");
@@ -284,7 +274,6 @@ export default function AdminDashboard() {
     };
   }, []);
 
-  // ক্যাটাগরি যোগ ও মোছা
   const handleAddCategory = async () => {
     if (!newCategoryName.trim()) return;
     setCategoryLoading(true);
@@ -303,7 +292,7 @@ export default function AdminDashboard() {
         alert("⚠️ " + data.message);
       }
     } catch {
-      alert("❌ ক্যাটাগরি সেভ করতে সমস্যা হয়েছে!");
+      alert("❌ ক্যাটাগরি সেভ করতে সমস্যা হয়েছে!");
     } finally {
       setCategoryLoading(false);
     }
@@ -327,11 +316,15 @@ export default function AdminDashboard() {
     }
   };
 
-  // Steadfast কুরিয়ার বুকিং হ্যান্ডলার
-  const handleCourierBooking = async (order: Order, index: number) => {
-    const orderId =
-      order.order_id || order.orderId || order.id || `ORD-${index + 1}`;
-    setBookingLoading(String(orderId));
+  // Steadfast কুরিয়ার বুকিং হ্যান্ডলার এবং ডেটা সিঙ্ক
+  const handleCourierBooking = async (order: Order) => {
+    const orderId = String(order.order_id || order.orderId || order.id || "");
+    if (!orderId) {
+      alert("অর্ডার আইডি পাওয়া যায়নি!");
+      return;
+    }
+
+    setBookingLoading(orderId);
 
     const rawPhone = String(order.number || order.phone || "");
     let formattedPhone = rawPhone.replace(/\D/g, "");
@@ -359,16 +352,8 @@ export default function AdminDashboard() {
       const result = await res.json();
       if (result.success) {
         alert(`✅ সফল! কুরিয়ার ট্র্যাকিং আইডি: ${result.consignmentId}`);
-        setOrders((prevOrders) => {
-          const updated = [...prevOrders];
-          updated[index] = {
-            ...updated[index],
-            status: "Booked",
-            tracking_id: result.consignmentId,
-            trackingCode: result.consignmentId,
-          };
-          return updated;
-        });
+        // ডেটাবেজ থেকে লেটেস্ট অর্ডার লিস্ট ফেচ করে UI সাথে সাথে আপডেট করা
+        await fetchOrders();
       } else {
         alert(`❌ বুকিং ব্যর্থ: ${result.error || result.message}`);
       }
@@ -379,7 +364,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // নতুন প্রোডাক্ট Supabase-এ সেভ করার হ্যান্ডলার
   const handleSaveProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!productForm.productName || !productForm.offerPrice) {
@@ -439,7 +423,6 @@ export default function AdminDashboard() {
     setTimeout(() => setPixelSaved(false), 3000);
   };
 
-  // Clerk Auth Safeguard
   if (!isLoaded) {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950 font-sans">
@@ -488,7 +471,6 @@ export default function AdminDashboard() {
     );
   }
 
-  // ক্যালকুলেশন
   const totalOrders = orders.length;
   const totalSales = orders.reduce(
     (acc, o) =>
@@ -520,18 +502,16 @@ export default function AdminDashboard() {
     );
   const bankReceivedAmount = totalCodCollection * 0.85;
 
-  const filteredOrders = orders
-    .filter((order) => {
-      const name = String(order.name || "").toLowerCase();
-      const phone = String(order.number || order.phone || "");
-      const address = String(order.address || "").toLowerCase();
-      return (
-        name.includes(searchTerm.toLowerCase()) ||
-        phone.includes(searchTerm) ||
-        address.includes(searchTerm.toLowerCase())
-      );
-    })
-    .reverse();
+  const filteredOrders = orders.filter((order) => {
+    const name = String(order.name || "").toLowerCase();
+    const phone = String(order.number || order.phone || "");
+    const address = String(order.address || "").toLowerCase();
+    return (
+      name.includes(searchTerm.toLowerCase()) ||
+      phone.includes(searchTerm) ||
+      address.includes(searchTerm.toLowerCase())
+    );
+  });
 
   const filteredProducts = products.filter(
     (p) =>
@@ -545,7 +525,6 @@ export default function AdminDashboard() {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans flex flex-col md:flex-row">
-      {/* ১. সাইডবার নেভিগেশন */}
       <aside className="w-full md:w-64 bg-slate-900 border-r border-slate-800 p-5 flex flex-col justify-between shrink-0">
         <div>
           <div className="mb-6 px-2">
@@ -725,7 +704,6 @@ export default function AdminDashboard() {
         </div>
       </aside>
 
-      {/* ২. মূল কন্টেন্ট এরিয়া */}
       <main className="flex-1 p-6 md:p-8 overflow-y-auto">
         <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-slate-900 border border-slate-800 p-4 rounded-2xl mb-8 gap-4 shadow-sm">
           <div className="w-full sm:w-80">
@@ -754,7 +732,6 @@ export default function AdminDashboard() {
           </div>
         </header>
 
-        {/* OVERVIEW TAB */}
         {activeTab === "overview" && (
           <div className="space-y-6">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -804,7 +781,6 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            {/* Quick Actions */}
             <div className="bg-slate-900 p-6 rounded-2xl shadow-sm border border-slate-800 flex flex-wrap gap-3 items-center justify-between">
               <div>
                 <h3 className="text-sm font-bold text-white uppercase tracking-wider">
@@ -836,7 +812,6 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            {/* Alerts */}
             <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-5">
               <div className="flex items-center gap-3 mb-3">
                 <AlertTriangle className="text-amber-400" size={20} />
@@ -872,7 +847,6 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* ORDERS TAB */}
         {activeTab === "orders" && (
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
             <h3 className="text-sm font-black text-white mb-2 uppercase tracking-wider">
@@ -939,7 +913,7 @@ export default function AdminDashboard() {
                         </td>
                         <td className="p-3 text-center">
                           <button
-                            onClick={() => handleCourierBooking(order, idx)}
+                            onClick={() => handleCourierBooking(order)}
                             disabled={
                               bookingLoading === String(currentId) || isBooked
                             }
@@ -965,7 +939,6 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* INVENTORY TAB */}
         {activeTab === "inventory" && (
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
             <div className="flex flex-col sm:flex-row justify-between items-center gap-4 border-b border-slate-800 pb-4">
@@ -1044,7 +1017,6 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* UPLOAD NEW PRODUCT TAB */}
         {activeTab === "upload" && (
           <form
             onSubmit={handleSaveProduct}
@@ -1177,7 +1149,6 @@ export default function AdminDashboard() {
                 ></textarea>
               </div>
 
-              {/* আলাদা ৪টি ছবির ইনপুট গ্রিড */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:col-span-2 bg-slate-950 p-5 rounded-2xl border border-slate-800">
                 <h3 className="text-xs font-black text-white sm:col-span-2 mb-1">
                   🖼️ আলাদা ছবির ফাইলের নাম বা ইউআরএল (image_url_1 to 4)
@@ -1261,7 +1232,6 @@ export default function AdminDashboard() {
           </form>
         )}
 
-        {/* CATEGORIES TAB */}
         {activeTab === "categories" && (
           <div className="bg-slate-900 border border-slate-800 p-6 rounded-3xl space-y-6 shadow-xl">
             <div className="border-b border-slate-800 pb-3 flex justify-between items-center">
@@ -1311,7 +1281,6 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* CUSTOMERS & FRAUD TAB */}
         {activeTab === "customers" && (
           <div className="space-y-6">
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -1455,7 +1424,6 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* MARKETING TAB */}
         {activeTab === "marketing" && (
           <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 md:p-8 space-y-6 shadow-xl">
             <h3 className="text-lg font-black text-white">
@@ -1511,7 +1479,6 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* SETTLEMENTS TAB */}
         {activeTab === "settlements" && (
           <div className="space-y-6">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
@@ -1552,7 +1519,6 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* AUTOMATION TAB */}
         {activeTab === "automation" && (
           <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 md:p-8 space-y-6 shadow-xl">
             <h3 className="text-lg font-black text-white flex items-center gap-2 border-b border-slate-800 pb-3">
@@ -1582,7 +1548,6 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* REPORTS TAB */}
         {activeTab === "reports" && (
           <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-4 shadow-xl">
             <h3 className="text-base font-black text-white flex items-center gap-2 border-b border-slate-800 pb-3">
@@ -1590,13 +1555,12 @@ export default function AdminDashboard() {
               Financial Reports
             </h3>
             <p className="text-xs text-slate-400">
-              সর্বমোট বিক্রয় এবং অর্ডারের ওপর ভিত্তি করে প্রস্তুতকৃত অটোমেটিক
+              সর্বমোট বিক্রয় এবং অর্ডারের ওপর ভিত্তি করে প্রস্তুতকৃত অটোমেটিক
               রিপোর্ট।
             </p>
           </div>
         )}
 
-        {/* STAFF & PERMISSIONS TAB */}
         {activeTab === "staff" && (
           <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-4 shadow-xl">
             <h3 className="text-base font-black text-white flex items-center gap-2 border-b border-slate-800 pb-3">
@@ -1619,7 +1583,6 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* CMS TAB */}
         {activeTab === "cms" && (
           <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-4 shadow-xl">
             <h3 className="text-base font-black text-white flex items-center gap-2 border-b border-slate-800 pb-3">
@@ -1638,7 +1601,6 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* SYSTEM HEALTH TAB */}
         {activeTab === "system" && (
           <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-4 shadow-xl">
             <h3 className="text-base font-black text-white flex items-center gap-2 border-b border-slate-800 pb-3">
@@ -1672,7 +1634,6 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* SETTINGS TAB */}
         {activeTab === "settings" && (
           <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-4 shadow-xl">
             <h3 className="text-base font-black text-white flex items-center gap-2 border-b border-slate-800 pb-3">
@@ -1680,12 +1641,11 @@ export default function AdminDashboard() {
               Settings
             </h3>
             <p className="text-xs text-slate-400">
-              সিস্টেম কনফিগারেশন সক্রিয় রয়েছে।
+              সিস্টেম কনফিগারেশন সক্রিয় রয়েছে।
             </p>
           </div>
         )}
 
-        {/* SOCIAL IMPACT & MEAL FUND TAB */}
         {activeTab === "impact" && (
           <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 md:p-8 space-y-6 shadow-xl">
             <div className="border-b border-slate-800 pb-3">
