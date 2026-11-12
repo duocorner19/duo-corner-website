@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Header from "@/components/landing/Header";
 import Hero from "@/components/landing/Hero";
 import TrustStrip from "@/components/landing/TrustStrip";
@@ -8,10 +8,10 @@ import Footer from "@/components/landing/Footer";
 import ProductGrid from "@/components/landing/ProductGrid";
 import CustomerReviews from "@/components/reviews/CustomerReviews";
 import { whatsappChatLink } from "@/lib/data";
+import { ArrowUp, ShieldAlert } from "lucide-react";
 
 export default function Home() {
   const [searchQuery, setSearchQuery] = useState("");
-  // ক্যাটাগরি স্টেট (টাইপ এরর সমাধানের জন্য স্টেট ডিক্লেয়ার করা হলো)
   const [categories, setCategories] = useState<string[]>([
     "ব্রেসলেট (Bracelet)",
     "নেকলেস (Necklace)",
@@ -19,16 +19,21 @@ export default function Home() {
     "গিফট বক্স (Gift Box)",
   ]);
 
+  // ইউআই ও নেভিগেশন স্টেট
+  const [showExitToast, setShowExitToast] = useState(false);
+  const [showScrollTop, setShowScrollTop] = useState(false);
+  const exitWarnedRef = useRef(false);
+
   const handleBackToHome = () => {
     setSearchQuery("");
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  // ১. গুগল শিট API থেকে লাইভ ক্যাটাগরি ফেচ করা
+  // ১. Supabase API থেকে লাইভ ক্যাটাগরি ফেচ করা
   useEffect(() => {
     async function loadCategories() {
       try {
-        const res = await fetch("/api/categories");
+        const res = await fetch("/api/categories", { cache: "no-store" });
         const data = await res.json();
         if (
           data.success &&
@@ -37,30 +42,80 @@ export default function Home() {
         ) {
           setCategories(data.categories);
         }
-      } catch (err) {
+      } catch {
         console.warn("Categories fetch error, using default fallback.");
       }
     }
     loadCategories();
   }, []);
 
-  // ২. কাস্টমার ব্যাক বাটন চেপে প্রোডাক্ট থেকে হোমপেজে আসলে ঠিক পূর্বের স্ক্রোল পজিশনে স্ক্রিন নামিয়ে দেওয়া
+  // ২. হোমপেজ ভিজিট মার্ক করা এবং আগের স্ক্রোল পজিশনে ফিরিয়ে আনা
   useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    // মার্ক করে রাখা যে ইউজার হোমপেজ হয়ে এসেছে
+    sessionStorage.setItem("duo_visited_home", "true");
+
     const savedScroll = sessionStorage.getItem("home_scroll_pos");
     if (savedScroll) {
-      setTimeout(() => {
+      const targetY = parseInt(savedScroll, 10);
+      const timer = setTimeout(() => {
         window.scrollTo({
-          top: parseInt(savedScroll, 10),
+          top: targetY,
           behavior: "smooth",
         });
         sessionStorage.removeItem("home_scroll_pos");
-      }, 100);
+      }, 120);
+      return () => clearTimeout(timer);
     }
+  }, []);
+
+  // ৩. হোমপেজ এক্সিট গার্ড (একবার ব্যাক চাপলে আটকে রাখবে, ২য় বার চাপলে বের হবে)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    // বর্তমান স্টেট গার্ড পুশ করা
+    window.history.pushState({ homeExitGuard: true }, "", window.location.href);
+
+    const handlePopState = () => {
+      if (!exitWarnedRef.current) {
+        exitWarnedRef.current = true;
+        setShowExitToast(true);
+        // ইউজারকে হোমপেজেই ধরে রাখতে পুনরায় স্টেট পুশ করা
+        window.history.pushState(
+          { homeExitGuard: true },
+          "",
+          window.location.href,
+        );
+
+        setTimeout(() => {
+          exitWarnedRef.current = false;
+          setShowExitToast(false);
+        }, 2500);
+      } else {
+        // ২.৫ সেকেন্ডের মধ্যে দ্বিতীয়বার ব্যাক চাপলে বের হতে দেওয়া
+        window.history.back();
+      }
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+    };
+  }, []);
+
+  // ৪. নিচে স্ক্রোল করলে Scroll-to-Top বাটন দেখানো
+  useEffect(() => {
+    const handleScroll = () => {
+      setShowScrollTop(window.scrollY > 450);
+    };
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
   return (
     <main className="min-h-screen bg-[#0a0a0a] text-white relative selection:bg-[#D4AF37] selection:text-black font-sans">
-      {/* ১. স্মার্ট ও প্রিমিয়াম হেডার (হোম এবং ডাইনামিক ক্যাটাগরি ফিল্টার সহ) */}
+      {/* ১. স্মার্ট ও প্রিমিয়াম হেডার */}
       <Header
         onHome={handleBackToHome}
         searchQuery={searchQuery}
@@ -92,8 +147,32 @@ export default function Home() {
       {/* ৪. প্রিমিয়াম ব্ল্যাক অ্যান্ড গোল্ড ফুটার */}
       <Footer />
 
-      {/* হোয়াটসঅ্যাপ ফ্লোটিং আইকন */}
-      <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-3">
+      {/* ডাবল-ব্যাক এক্সিট ওয়ার্নিং টোস্ট (প্রিমিয়াম গোল্ডেন পিল) */}
+      {showExitToast && (
+        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 w-[90%] max-w-sm animate-in fade-in slide-in-from-bottom-4 duration-200">
+          <div className="bg-[#181818]/95 backdrop-blur-md border border-[#D4AF37]/60 text-white px-4 py-3 rounded-2xl shadow-2xl flex items-center justify-center gap-2.5 text-xs font-bold">
+            <ShieldAlert
+              size={18}
+              className="text-[#D4AF37] shrink-0 animate-pulse"
+            />
+            <span>ওয়েবসাইট থেকে বের হতে চাইলে আবার ব্যাক চাপুন</span>
+          </div>
+        </div>
+      )}
+
+      {/* ফ্লোটিং অ্যাকশন বাটনসমূহ (Scroll Top + WhatsApp) */}
+      <div className="fixed bottom-6 right-6 z-50 flex flex-col items-center gap-3">
+        {showScrollTop && (
+          <button
+            type="button"
+            onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+            className="w-10 h-10 bg-[#1a1a1a]/90 hover:bg-[#D4AF37] text-[#D4AF37] hover:text-black border border-[#D4AF37]/40 rounded-full flex items-center justify-center shadow-xl transition-all hover:scale-110 cursor-pointer"
+            title="উপরে যান"
+          >
+            <ArrowUp size={18} />
+          </button>
+        )}
+
         <a
           href={whatsappChatLink}
           target="_blank"

@@ -16,17 +16,28 @@ type ProductDetailProps = {
   onBack: () => void;
 };
 
+// পাবলিক ফোল্ডার বা এক্সটার্নাল URL অটো-ফরম্যাটিং হেল্পার
+function resolveMediaPath(rawPath: unknown, fallback: string): string {
+  if (!rawPath || typeof rawPath !== "string") return fallback;
+  const clean = rawPath.trim();
+  if (!clean) return fallback;
+  if (/^https?:\/\//i.test(clean)) return clean;
+  // উইন্ডোজ ব্যাকস্ল্যাশ থাকলে ফরওয়ার্ড স্ল্যাশে রূপান্তর ও শুরুতে '/' নিশ্চিত করা
+  const normalized = clean.replace(/\\/g, "/").replace(/^public\//i, "");
+  return normalized.startsWith("/") ? normalized : `/${normalized}`;
+}
+
 export default function ProductDetail({ product, onBack }: ProductDetailProps) {
   const p = product as any;
 
-  const productName = p.name || p.productName || p["Product Name"] || "Product";
+  const productName = p["Product Name"] || p.name || p.productName || "Product";
 
   const regularPrice = Number(
-    p.regularPrice || p["Regular Price"] || p.RegularPrice || 999,
+    p["Regular Price"] || p.regularPrice || p.RegularPrice || 999,
   );
 
   const offerPrice = Number(
-    p.basePrice || p.price || p["Offer Price"] || p.OfferPrice || 799,
+    p["Offer Price"] || p.basePrice || p.price || p.OfferPrice || 799,
   );
 
   const discountPercent =
@@ -34,77 +45,140 @@ export default function ProductDetail({ product, onBack }: ProductDetailProps) {
       ? Math.round(((regularPrice - offerPrice) / regularPrice) * 100)
       : 0;
 
-  const productCategory = p.category || p["Category"] || "Couple Item";
+  const productCategory = p["Category"] || p.category || "Couple Item";
 
   const productDescription =
-    p.description ||
     p["Description"] ||
+    p.description ||
     "এক্সক্লুসিভ কাপল প্রোডাক্ট এবং আকর্ষণীয় গিফট বক্স।";
 
-  let productAttributes = p.attributes || [];
-
-  if (typeof productAttributes === "string") {
-    try {
-      productAttributes = JSON.parse(productAttributes);
-    } catch {
-      productAttributes = [];
-    }
-  }
-
-  if (!Array.isArray(productAttributes) || productAttributes.length === 0) {
-    productAttributes = [
-      { label: "Category", value: productCategory },
+  // =========================================================================
+  // ৮টি স্পেসিফিকেশন বক্স তৈরি (প্রথম ২টি মেইন + সুপাবেজের বাকি ৬টি কলাম)
+  // =========================================================================
+  const buildSpecifications = () => {
+    const specs: { label: string; value: string }[] = [
+      { label: "Category", value: String(productCategory) },
       {
         label: "Stock",
-        value: String(p.stock || p["Stock"] || "Available"),
+        value:
+          p["Stock"] !== undefined && p["Stock"] !== null
+            ? Number(p["Stock"]) > 0
+              ? `In Stock (${p["Stock"]})`
+              : "Available"
+            : String(p.stock || "Available"),
       },
     ];
-  }
 
-  let imageList: string[] = [];
-
-  if (Array.isArray(p.images) && p.images.length > 0) {
-    imageList = p.images;
-  } else {
-    const columnSources = [
-      p["Image URL1"] || p.imageUrl1,
-      p["Image URL2"] || p.imageUrl2,
-      p["Image URL3"] || p.imageUrl3,
-      p["Image URL4"] || p.imageUrl4,
+    // সুপাবেজ টেবিলের ৬ জোড়া ডায়নামিক স্পেসিফিকেশন কলাম
+    const dynamicPairs = [
+      {
+        label: p["product type"] || "Product Type",
+        value: p["Value 1"],
+      },
+      {
+        label: p["usable gender"] || "Usable Gender",
+        value: p["Value 2"],
+      },
+      {
+        label: p["Material"] || "Material",
+        value: p["Value 3"],
+      },
+      {
+        label: p["Color"] || "Color",
+        value: p["Value 4"],
+      },
+      {
+        label: p["Single package size"] || "Package Size",
+        value: p["Value 5"],
+      },
+      {
+        label: p["Single gross weight"] || "Gross Weight",
+        value: p["Value 6"],
+      },
     ];
 
-    columnSources.forEach((img) => {
-      if (img && typeof img === "string" && img.trim() !== "") {
-        const clean = img.trim();
-
-        const formatted = /^https?:\/\//i.test(clean)
-          ? clean
-          : "/" + clean.replace(/^\/+/, "");
-
-        if (!imageList.includes(formatted)) {
-          imageList.push(formatted);
-        }
+    dynamicPairs.forEach((pair) => {
+      const cleanLabel = String(pair.label || "").trim();
+      const cleanValue = String(pair.value || "").trim();
+      if (cleanLabel && cleanValue) {
+        specs.push({ label: cleanLabel, value: cleanValue });
       }
     });
-  }
+
+    // যদি JSON আকারে অতিরিক্ত attributes থাকে তবে সেটিও সাপোর্ট করবে
+    if (specs.length <= 2 && p.attributes) {
+      let parsed = p.attributes;
+      if (typeof parsed === "string") {
+        try {
+          parsed = JSON.parse(parsed);
+        } catch {
+          parsed = [];
+        }
+      }
+      if (Array.isArray(parsed)) {
+        parsed.forEach((item: any) => {
+          if (item?.label && item?.value) {
+            specs.push({
+              label: String(item.label),
+              value: String(item.value),
+            });
+          }
+        });
+      }
+    }
+
+    return specs;
+  };
+
+  const productAttributes = buildSpecifications();
+
+  // =========================================================================
+  // পাবলিক ফোল্ডার ও সুপাবেজ থেকে সব ছবি অটো-ডিটেক্ট করা
+  // =========================================================================
+  let imageList: string[] = [];
+
+  const columnSources = [
+    p["Image URL1"],
+    p["Image URL2"],
+    p["Image URL3"],
+    p["Image URL4"],
+    p.imageUrl1,
+    p.imageUrl2,
+    p.imageUrl3,
+    p.imageUrl4,
+    ...(Array.isArray(p.images) ? p.images : []),
+  ];
+
+  columnSources.forEach((img) => {
+    if (img && typeof img === "string" && img.trim() !== "") {
+      const formatted = resolveMediaPath(img, "");
+      if (formatted && !imageList.includes(formatted)) {
+        imageList.push(formatted);
+      }
+    }
+  });
 
   if (imageList.length === 0) {
     imageList = ["/parl.jpg"];
   }
 
-  let productVideo = p.videoUrl || p["Video URL"] || p.video || "/video.mp4";
-
-  if (
-    productVideo &&
-    !productVideo.startsWith("http") &&
-    !productVideo.startsWith("/")
-  ) {
-    productVideo = "/" + productVideo;
-  }
+  // =========================================================================
+  // পাবলিক ফোল্ডার থেকে ভিডিও অটো-ডিটেক্ট করা ("Video URL" কলাম)
+  // =========================================================================
+  const rawVideoSource =
+    p["Video URL"] || p.videoUrl || p.video || "/video.mp4";
+  const productVideo = resolveMediaPath(rawVideoSource, "/video.mp4");
 
   const [selectedImage, setSelectedImage] = useState(
     imageList[0] || "/parl.jpg",
   );
+
+  // প্রোডাক্ট পরিবর্তন হলে প্রথম ছবি অটো সিলেক্ট নিশ্চিত করা
+  useEffect(() => {
+    if (imageList.length > 0 && !imageList.includes(selectedImage)) {
+      setSelectedImage(imageList[0]);
+    }
+  }, [product]);
 
   const [quantity, setQuantity] = useState(1);
 
@@ -152,7 +226,8 @@ export default function ProductDetail({ product, onBack }: ProductDetailProps) {
     setSelectedDistrict(e.target.value);
   };
 
-  const deliveryCharge = selectedDistrict === "ঢাকা" ? 100 : 140;
+  // ডেলিভারি চার্জ: ঢাকা ৮০ টাকা, ঢাকার বাইরে ১৪০ টাকা
+  const deliveryCharge = selectedDistrict === "ঢাকা" ? 80 : 140;
   const subtotal = offerPrice * quantity;
   const total = subtotal + deliveryCharge;
 
@@ -279,9 +354,8 @@ export default function ProductDetail({ product, onBack }: ProductDetailProps) {
         onClick={() => {
           window.scrollTo({ top: 0, left: 0, behavior: "instant" });
           onBack();
-          window.location.href = "/";
         }}
-        className="mb-4 inline-flex items-center gap-2 bg-white hover:bg-gray-50 text-gray-700 font-semibold px-4 py-2 rounded-xl shadow-sm border border-gray-200 text-xs transition cursor-pointer"
+        className="mb-4 inline-flex items-center gap-2 bg-[#181818] hover:bg-[#242424] text-[#D4AF37] font-semibold px-4 py-2 rounded-xl shadow-md border border-[#D4AF37]/30 text-xs transition cursor-pointer"
       >
         <span>←</span>
         হোমপেজে ফিরে যান
@@ -304,6 +378,7 @@ export default function ProductDetail({ product, onBack }: ProductDetailProps) {
         productName={productName}
         productDescription={productDescription}
         productVideo={productVideo}
+        extraHeading={p["PRODUCT SPECIFICATIONS"]}
       />
 
       <CheckoutForm
