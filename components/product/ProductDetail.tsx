@@ -308,15 +308,17 @@ export default function ProductDetail({ product, onBack }: ProductDetailProps) {
         throw new Error(result?.message || "অর্ডার সংরক্ষণ করা সম্ভব হয়নি।");
       }
 
-      trackEvent("PlaceOrder", {
+      trackEvent("Purchase", {
         userData: {
           phone: cleanPhone,
           firstName: fullName.trim(),
         },
         customData: {
           content_name: productName,
+          content_category: productCategory,
           value: total,
           currency: "BDT",
+          order_id: result?.orderId,
         },
       });
 
