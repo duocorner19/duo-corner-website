@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import type { Product } from "@/lib/data";
 import { divisionData } from "@/lib/data";
 import { trackEvent } from "@/lib/tracker";
@@ -16,28 +16,31 @@ type ProductDetailProps = {
   onBack: () => void;
 };
 
-// পাবলিক ফোল্ডার বা এক্সটার্নাল URL অটো-ফরম্যাটিং হেল্পার
 function resolveMediaPath(rawPath: unknown, fallback: string): string {
   if (!rawPath || typeof rawPath !== "string") return fallback;
-  const clean = rawPath.trim();
-  if (!clean) return fallback;
-  if (/^https?:\/\//i.test(clean)) return clean;
-  // উইন্ডোজ ব্যাকস্ল্যাশ থাকলে ফরওয়ার্ড স্ল্যাশে রূপান্তর ও শুরুতে '/' নিশ্চিত করা
-  const normalized = clean.replace(/\\/g, "/").replace(/^public\//i, "");
+  const trimmed = rawPath.trim();
+  if (!trimmed) return fallback;
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  const normalized = trimmed.replace(/\\/g, "/").replace(/^public\//i, "");
   return normalized.startsWith("/") ? normalized : `/${normalized}`;
 }
 
 export default function ProductDetail({ product, onBack }: ProductDetailProps) {
-  const p = product as any;
+  const item = product as any;
 
-  const productName = p["Product Name"] || p.name || p.productName || "Product";
+  const productName =
+    item["Product Name"] || item.name || item.productName || "Product";
 
   const regularPrice = Number(
-    p["Regular Price"] || p.regularPrice || p.RegularPrice || 999,
+    item["Regular Price"] || item.regularPrice || item.RegularPrice || 999,
   );
 
   const offerPrice = Number(
-    p["Offer Price"] || p.basePrice || p.price || p.OfferPrice || 799,
+    item["Offer Price"] ||
+      item.basePrice ||
+      item.price ||
+      item.OfferPrice ||
+      799,
   );
 
   const discountPercent =
@@ -45,135 +48,106 @@ export default function ProductDetail({ product, onBack }: ProductDetailProps) {
       ? Math.round(((regularPrice - offerPrice) / regularPrice) * 100)
       : 0;
 
-  const productCategory = p["Category"] || p.category || "Couple Item";
+  const productCategory = item["Category"] || item.category || "Couple Item";
 
   const productDescription =
-    p["Description"] ||
-    p.description ||
+    item["Description"] ||
+    item.description ||
     "এক্সক্লুসিভ কাপল প্রোডাক্ট এবং আকর্ষণীয় গিফট বক্স।";
 
-  // =========================================================================
-  // ৮টি স্পেসিফিকেশন বক্স তৈরি (প্রথম ২টি মেইন + সুপাবেজের বাকি ৬টি কলাম)
-  // =========================================================================
   const buildSpecifications = () => {
-    const specs: { label: string; value: string }[] = [
+    const list: { label: string; value: string }[] = [
       { label: "Category", value: String(productCategory) },
       {
         label: "Stock",
         value:
-          p["Stock"] !== undefined && p["Stock"] !== null
-            ? Number(p["Stock"]) > 0
-              ? `In Stock (${p["Stock"]})`
+          item["Stock"] !== undefined && item["Stock"] !== null
+            ? Number(item["Stock"]) > 0
+              ? `In Stock (${item["Stock"]})`
               : "Available"
-            : String(p.stock || "Available"),
+            : String(item.stock || "Available"),
       },
     ];
 
-    // সুপাবেজ টেবিলের ৬ জোড়া ডায়নামিক স্পেসিফিকেশন কলাম
-    const dynamicPairs = [
+    const specFields = [
+      { label: item["product type"] || "Product Type", value: item["Value 1"] },
       {
-        label: p["product type"] || "Product Type",
-        value: p["Value 1"],
+        label: item["usable gender"] || "Usable Gender",
+        value: item["Value 2"],
+      },
+      { label: item["Material"] || "Material", value: item["Value 3"] },
+      { label: item["Color"] || "Color", value: item["Value 4"] },
+      {
+        label: item["Single package size"] || "Package Size",
+        value: item["Value 5"],
       },
       {
-        label: p["usable gender"] || "Usable Gender",
-        value: p["Value 2"],
-      },
-      {
-        label: p["Material"] || "Material",
-        value: p["Value 3"],
-      },
-      {
-        label: p["Color"] || "Color",
-        value: p["Value 4"],
-      },
-      {
-        label: p["Single package size"] || "Package Size",
-        value: p["Value 5"],
-      },
-      {
-        label: p["Single gross weight"] || "Gross Weight",
-        value: p["Value 6"],
+        label: item["Single gross weight"] || "Gross Weight",
+        value: item["Value 6"],
       },
     ];
 
-    dynamicPairs.forEach((pair) => {
-      const cleanLabel = String(pair.label || "").trim();
-      const cleanValue = String(pair.value || "").trim();
-      if (cleanLabel && cleanValue) {
-        specs.push({ label: cleanLabel, value: cleanValue });
-      }
-    });
-
-    // যদি JSON আকারে অতিরিক্ত attributes থাকে তবে সেটিও সাপোর্ট করবে
-    if (specs.length <= 2 && p.attributes) {
-      let parsed = p.attributes;
-      if (typeof parsed === "string") {
-        try {
-          parsed = JSON.parse(parsed);
-        } catch {
-          parsed = [];
-        }
-      }
-      if (Array.isArray(parsed)) {
-        parsed.forEach((item: any) => {
-          if (item?.label && item?.value) {
-            specs.push({
-              label: String(item.label),
-              value: String(item.value),
-            });
-          }
-        });
+    for (const field of specFields) {
+      const label = String(field.label || "").trim();
+      const value = String(field.value || "").trim();
+      if (label && value) {
+        list.push({ label, value });
       }
     }
 
-    return specs;
+    if (list.length <= 2 && item.attributes) {
+      let extraSpecs = item.attributes;
+      if (typeof extraSpecs === "string") {
+        try {
+          extraSpecs = JSON.parse(extraSpecs);
+        } catch {
+          extraSpecs = [];
+        }
+      }
+      if (Array.isArray(extraSpecs)) {
+        for (const entry of extraSpecs) {
+          if (entry?.label && entry?.value) {
+            list.push({
+              label: String(entry.label),
+              value: String(entry.value),
+            });
+          }
+        }
+      }
+    }
+
+    return list;
   };
 
   const productAttributes = buildSpecifications();
 
-  // =========================================================================
-  // পাবলিক ফোল্ডার ও সুপাবেজ থেকে সব ছবি অটো-ডিটেক্ট করা
-  // =========================================================================
-  let imageList: string[] = [];
-
-  const columnSources = [
-    p["Image URL1"],
-    p["Image URL2"],
-    p["Image URL3"],
-    p["Image URL4"],
-    p.imageUrl1,
-    p.imageUrl2,
-    p.imageUrl3,
-    p.imageUrl4,
-    ...(Array.isArray(p.images) ? p.images : []),
+  const rawImages = [
+    item["Image URL1"],
+    item["Image URL2"],
+    item["Image URL3"],
+    item["Image URL4"],
+    item.imageUrl1,
+    item.imageUrl2,
+    item.imageUrl3,
+    item.imageUrl4,
+    ...(Array.isArray(item.images) ? item.images : []),
   ];
 
-  columnSources.forEach((img) => {
-    if (img && typeof img === "string" && img.trim() !== "") {
-      const formatted = resolveMediaPath(img, "");
-      if (formatted && !imageList.includes(formatted)) {
-        imageList.push(formatted);
+  const collectedImages: string[] = [];
+  for (const src of rawImages) {
+    if (typeof src === "string" && src.trim()) {
+      const resolved = resolveMediaPath(src, "");
+      if (resolved && !collectedImages.includes(resolved)) {
+        collectedImages.push(resolved);
       }
     }
-  });
-
-  if (imageList.length === 0) {
-    imageList = ["/parl.jpg"];
   }
 
-  // =========================================================================
-  // পাবলিক ফোল্ডার থেকে ভিডিও অটো-ডিটেক্ট করা ("Video URL" কলাম)
-  // =========================================================================
-  const rawVideoSource =
-    p["Video URL"] || p.videoUrl || p.video || "/video.mp4";
-  const productVideo = resolveMediaPath(rawVideoSource, "/video.mp4");
+  const imageList =
+    collectedImages.length > 0 ? collectedImages : ["/parl.jpg"];
 
-  const [selectedImage, setSelectedImage] = useState(
-    imageList[0] || "/parl.jpg",
-  );
+  const [selectedImage, setSelectedImage] = useState(imageList[0]);
 
-  // প্রোডাক্ট পরিবর্তন হলে প্রথম ছবি অটো সিলেক্ট নিশ্চিত করা
   useEffect(() => {
     if (imageList.length > 0 && !imageList.includes(selectedImage)) {
       setSelectedImage(imageList[0]);
@@ -181,37 +155,41 @@ export default function ProductDetail({ product, onBack }: ProductDetailProps) {
   }, [product]);
 
   const [quantity, setQuantity] = useState(1);
-
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
 
   const districtEntries = Object.entries(divisionData).flatMap(
     ([division, districtMap]) =>
-      Object.keys(districtMap).map((district) => ({
-        division,
-        district,
-      })),
+      Object.keys(districtMap).map((district) => ({ division, district })),
   );
 
   const districts = Array.from(
-    new Set(districtEntries.map((item) => item.district)),
+    new Set(districtEntries.map((entry) => entry.district)),
   );
 
-  const initialDistrictEntry =
-    districtEntries.find((item) => item.district === "ঢাকা") ||
-    districtEntries[0];
+  const defaultDistrict =
+    districtEntries.find((entry) => entry.district === "ঢাকা")?.district ||
+    districtEntries[0]?.district ||
+    "ঢাকা";
 
-  const [selectedDistrict, setSelectedDistrict] = useState(
-    initialDistrictEntry?.district || "ঢাকা",
-  );
-
+  const [selectedDistrict, setSelectedDistrict] = useState(defaultDistrict);
   const [specialNote, setSpecialNote] = useState("");
   const [agreed, setAgreed] = useState(false);
   const [loading, setLoading] = useState(false);
   const [orderSuccess, setOrderSuccess] = useState(false);
 
+  const initiatedRef = useRef(false);
+  const mountedQtyRef = useRef(true);
+
+  const deliveryCharge = selectedDistrict === "ঢাকা" ? 80 : 140;
+  const subtotal = offerPrice * quantity;
+  const total = subtotal + deliveryCharge;
+
   useEffect(() => {
+    initiatedRef.current = false;
+    mountedQtyRef.current = true;
+
     trackEvent("ViewContent", {
       customData: {
         content_name: productName,
@@ -222,22 +200,58 @@ export default function ProductDetail({ product, onBack }: ProductDetailProps) {
     });
   }, [productName, offerPrice, productCategory]);
 
+  useEffect(() => {
+    if (mountedQtyRef.current) {
+      mountedQtyRef.current = false;
+      return;
+    }
+
+    trackEvent("AddToCart", {
+      customData: {
+        content_name: productName,
+        content_category: productCategory,
+        quantity,
+        value: offerPrice * quantity,
+        currency: "BDT",
+      },
+    });
+  }, [quantity, productName, productCategory, offerPrice]);
+
+  const beginCheckoutOnce = () => {
+    if (initiatedRef.current) return;
+    initiatedRef.current = true;
+
+    trackEvent("InitiateCheckout", {
+      customData: {
+        content_name: productName,
+        content_category: productCategory,
+        num_items: quantity,
+        value: total,
+        currency: "BDT",
+      },
+    });
+  };
+
   const handleDistrictChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    beginCheckoutOnce();
     setSelectedDistrict(e.target.value);
   };
 
-  // ডেলিভারি চার্জ: ঢাকা ৮০ টাকা, ঢাকার বাইরে ১৪০ টাকা
-  const deliveryCharge = selectedDistrict === "ঢাকা" ? 80 : 140;
-  const subtotal = offerPrice * quantity;
-  const total = subtotal + deliveryCharge;
-
   const scrollToCheckout = () => {
-    const formElement = document.getElementById("one-page-checkout");
-    if (formElement) {
-      formElement.scrollIntoView({
-        behavior: "smooth",
-        block: "start",
-      });
+    trackEvent("AddToCart", {
+      customData: {
+        content_name: productName,
+        content_category: productCategory,
+        quantity,
+        value: subtotal,
+        currency: "BDT",
+      },
+    });
+    beginCheckoutOnce();
+
+    const targetEl = document.getElementById("one-page-checkout");
+    if (targetEl) {
+      targetEl.scrollIntoView({ behavior: "smooth", block: "start" });
     }
   };
 
@@ -255,9 +269,7 @@ export default function ProductDetail({ product, onBack }: ProductDetailProps) {
     }
 
     const cleanPhone = phone.trim();
-    const bdPhoneRegex = /^01[3-9]\d{8}$/;
-
-    if (!bdPhoneRegex.test(cleanPhone)) {
+    if (!/^01[3-9]\d{8}$/.test(cleanPhone)) {
       alert(
         "দয়া করে ১১ ডিজিটের সঠিক বাংলাদেশি মোবাইল নম্বর দিন। যেমন: 017XXXXXXXX",
       );
@@ -273,23 +285,20 @@ export default function ProductDetail({ product, onBack }: ProductDetailProps) {
     setLoading(true);
 
     try {
-      let attributionData: Record<string, string> = {};
-
+      let attribution: Record<string, string> = {};
       if (typeof window !== "undefined") {
         try {
-          attributionData = JSON.parse(
+          attribution = JSON.parse(
             sessionStorage.getItem("duo_attribution") || "{}",
           );
         } catch {
-          attributionData = {};
+          attribution = {};
         }
       }
 
-      const res = await fetch("/api/save-order", {
+      const response = await fetch("/api/save-order", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: fullName.trim(),
           number: cleanPhone,
@@ -297,15 +306,15 @@ export default function ProductDetail({ product, onBack }: ProductDetailProps) {
           address: address.trim(),
           note: `${productName} (Qty: ${quantity}), জেলা: ${selectedDistrict}, Note: ${specialNote}, Delivery: ${deliveryCharge} BDT`,
           collection_amount: total,
-          utmSource: attributionData.utm_source || "Direct",
-          utmCampaign: attributionData.utm_campaign || "",
+          utmSource: attribution.utm_source || "Direct",
+          utmCampaign: attribution.utm_campaign || "",
         }),
       });
 
-      const result = await res.json();
+      const data = await response.json();
 
-      if (!res.ok || (result?.status && result.status !== "success")) {
-        throw new Error(result?.message || "অর্ডার সংরক্ষণ করা সম্ভব হয়নি।");
+      if (!response.ok || (data?.status && data.status !== "success")) {
+        throw new Error(data?.message || "অর্ডার সংরক্ষণ করা সম্ভব হয়নি।");
       }
 
       trackEvent("Purchase", {
@@ -318,7 +327,7 @@ export default function ProductDetail({ product, onBack }: ProductDetailProps) {
           content_category: productCategory,
           value: total,
           currency: "BDT",
-          order_id: result?.orderId,
+          order_id: data?.orderId,
         },
       });
 
@@ -350,14 +359,27 @@ export default function ProductDetail({ product, onBack }: ProductDetailProps) {
   }
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-6 font-sans text-gray-900">
+    <div
+      className="max-w-2xl mx-auto px-3.5 sm:px-4 py-4 font-sans text-gray-900"
+      onFocusCapture={(e) => {
+        const el = e.target as HTMLElement | null;
+        if (
+          el &&
+          (el.tagName === "INPUT" ||
+            el.tagName === "TEXTAREA" ||
+            el.tagName === "SELECT")
+        ) {
+          beginCheckoutOnce();
+        }
+      }}
+    >
       <button
         type="button"
         onClick={() => {
           window.scrollTo({ top: 0, left: 0, behavior: "instant" });
           onBack();
         }}
-        className="mb-4 inline-flex items-center gap-2 bg-[#181818] hover:bg-[#242424] text-[#D4AF37] font-semibold px-4 py-2 rounded-xl shadow-md border border-[#D4AF37]/30 text-xs transition cursor-pointer"
+        className="mb-3 inline-flex items-center gap-1.5 bg-[#191b1f] hover:bg-[#23272d] text-[#d4a24c] font-semibold px-3 py-1.5 rounded-lg border border-[#2e333c] text-xs transition cursor-pointer"
       >
         <span>←</span>
         হোমপেজে ফিরে যান
@@ -379,8 +401,7 @@ export default function ProductDetail({ product, onBack }: ProductDetailProps) {
         productAttributes={productAttributes}
         productName={productName}
         productDescription={productDescription}
-        productVideo={productVideo}
-        extraHeading={p["PRODUCT SPECIFICATIONS"]}
+        extraHeading={item["PRODUCT SPECIFICATIONS"]}
       />
 
       <CheckoutForm

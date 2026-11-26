@@ -1,10 +1,8 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import {
   Sparkles,
-  Video,
-  CheckCircle2,
   ChevronRight,
   ChevronLeft,
   ShieldCheck,
@@ -16,27 +14,18 @@ type ProductSpecsProps = {
   productAttributes: { label: string; value: string }[];
   productName: string;
   productDescription: string;
-  productVideo: string;
+  productVideo?: string;
   extraHeading?: string;
 };
 
 export default function ProductSpecs({
   productAttributes,
-  productName,
   productDescription,
-  productVideo,
   extraHeading,
 }: ProductSpecsProps) {
   // স্পেসিফিকেশন স্লাইডার/পেজিনেশন স্টেট (প্রথমে ২টি মেইন দেখাবে, ক্লিক করলে বাকিগুলো)
   const [showAllSpecs, setShowAllSpecs] = useState(false);
   const [pageIndex, setPageIndex] = useState(0);
-
-  // ভিডিও সোর্স স্টেট (সুপাবেজের নাম অনুযায়ী পাবলিক ফোল্ডার থেকে লোড হবে, না পেলে ফলব্যাক)
-  const [videoSrc, setVideoSrc] = useState(productVideo);
-
-  useEffect(() => {
-    setVideoSrc(productVideo);
-  }, [productVideo]);
 
   const totalAttrs = productAttributes.length;
   const hasMoreSpecs = totalAttrs > 2;
@@ -153,40 +142,6 @@ export default function ProductSpecs({
           </div>
         </div>
       </div>
-
-      {/* =====================================================================
-          ২. প্রোডাক্ট লাইভ ভিডিও রিভিউ (পাবলিক ফোল্ডার অটো-ডিটেক্ট)
-         ===================================================================== */}
-      {videoSrc && (
-        <div className="bg-[#141414] border border-[#D4AF37]/30 rounded-2xl p-4 sm:p-5 shadow-xl">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-xs font-black text-[#D4AF37] uppercase tracking-wider flex items-center gap-1.5">
-              <Video size={15} className="text-[#D4AF37]" /> প্রোডাক্ট লাইভ
-              ভিডিও রিভিউ
-            </h3>
-            <span className="text-[10px] bg-emerald-950 text-emerald-400 border border-emerald-500/30 px-2.5 py-0.5 rounded-full font-bold flex items-center gap-1">
-              <CheckCircle2 size={11} /> রিয়েল আনবক্সিং
-            </span>
-          </div>
-
-          <div className="relative aspect-video rounded-xl overflow-hidden bg-black border border-gray-800 shadow-2xl">
-            <video
-              key={videoSrc}
-              src={videoSrc}
-              controls
-              playsInline
-              preload="metadata"
-              onError={() => {
-                // যদি নির্দিষ্ট ভিডিও ফাইলটি public ফোল্ডারে না পাওয়া যায় তবে ফলব্যাক ভিডিও প্লে হবে
-                if (videoSrc !== "/video.mp4") {
-                  setVideoSrc("/video.mp4");
-                }
-              }}
-              className="w-full h-full object-contain"
-            />
-          </div>
-        </div>
-      )}
     </div>
   );
 }
