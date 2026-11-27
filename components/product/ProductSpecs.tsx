@@ -23,19 +23,16 @@ export default function ProductSpecs({
   productDescription,
   extraHeading,
 }: ProductSpecsProps) {
-  // স্পেসিফিকেশন স্লাইডার/পেজিনেশন স্টেট (প্রথমে ২টি মেইন দেখাবে, ক্লিক করলে বাকিগুলো)
   const [showAllSpecs, setShowAllSpecs] = useState(false);
   const [pageIndex, setPageIndex] = useState(0);
 
   const totalAttrs = productAttributes.length;
   const hasMoreSpecs = totalAttrs > 2;
+  const maxPage = Math.max(0, Math.ceil(totalAttrs / 2) - 1);
 
-  // কাস্টমার যদি তীর বাটনে ক্লিক করে পেজ স্লাইড করে বা "সবগুলো দেখুন" চাপে
   const visibleAttributes = showAllSpecs
     ? productAttributes
     : productAttributes.slice(pageIndex * 2, pageIndex * 2 + 2);
-
-  const maxPage = Math.max(0, Math.ceil(totalAttrs / 2) - 1);
 
   const handleNextSlide = () => {
     setPageIndex((prev) => (prev < maxPage ? prev + 1 : 0));
@@ -46,29 +43,25 @@ export default function ProductSpecs({
   };
 
   return (
-    <div className="space-y-4 my-6 font-sans">
-      {/* =====================================================================
-          ১. প্রোডাক্টের বিশেষ বিবরণ ও ৮টি ডায়নামিক স্পেসিফিকেশন টেবিল কার্ড
-         ===================================================================== */}
-      <div className="bg-[#141414] border border-[#D4AF37]/30 rounded-2xl p-4 sm:p-5 shadow-xl text-gray-200">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-xs font-black text-[#D4AF37] uppercase tracking-wider flex items-center gap-1.5">
-            <Sparkles size={14} className="text-[#D4AF37]" />
+    <div className="my-4 font-sans">
+      <div className="bg-[#141619] border border-[#2a2e35] rounded-xl p-3.5 sm:p-4 text-gray-200">
+        <div className="flex items-center justify-between gap-2 mb-2.5">
+          <h3 className="text-xs font-bold text-[#d4a24c] uppercase tracking-wide flex items-center gap-1.5">
+            <Sparkles size={13} className="text-[#d4a24c]" />
             {extraHeading || "প্রোডাক্টের বিশেষ বিবরণ"}
           </h3>
 
-          {/* ডানপাশে স্লাইড কন্ট্রোল ও সব দেখার বাটন */}
           {hasMoreSpecs && (
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 shrink-0">
               {!showAllSpecs && (
-                <div className="flex items-center gap-1 bg-black/50 border border-gray-800 rounded-lg p-0.5">
+                <div className="flex items-center gap-0.5 bg-[#1b1d21] border border-[#2f333a] rounded-lg p-0.5">
                   <button
                     type="button"
                     onClick={handlePrevSlide}
-                    className="p-1 text-gray-400 hover:text-[#D4AF37] transition cursor-pointer"
+                    className="p-1 text-gray-400 hover:text-[#d4a24c] transition cursor-pointer"
                     title="পূর্ববর্তী স্পেক্স"
                   >
-                    <ChevronLeft size={14} />
+                    <ChevronLeft size={13} />
                   </button>
                   <span className="text-[10px] font-bold text-gray-400 px-1">
                     {pageIndex + 1}/{maxPage + 1}
@@ -76,10 +69,10 @@ export default function ProductSpecs({
                   <button
                     type="button"
                     onClick={handleNextSlide}
-                    className="p-1 text-gray-400 hover:text-[#D4AF37] transition cursor-pointer"
+                    className="p-1 text-gray-400 hover:text-[#d4a24c] transition cursor-pointer"
                     title="পরবর্তী স্পেক্স দেখুন"
                   >
-                    <ChevronRight size={14} />
+                    <ChevronRight size={13} />
                   </button>
                 </div>
               )}
@@ -87,56 +80,50 @@ export default function ProductSpecs({
               <button
                 type="button"
                 onClick={() => setShowAllSpecs(!showAllSpecs)}
-                className="text-[10px] font-bold bg-[#D4AF37]/15 hover:bg-[#D4AF37]/25 text-[#D4AF37] border border-[#D4AF37]/30 px-2.5 py-1 rounded-lg transition cursor-pointer flex items-center gap-0.5"
+                className="text-[10px] font-bold bg-[#1e2127] hover:bg-[#262a31] text-[#d4a24c] border border-[#323741] px-2 py-1 rounded-lg transition cursor-pointer"
               >
-                <span>
-                  {showAllSpecs
-                    ? "সংক্ষিপ্ত করুন"
-                    : `আরো (${totalAttrs - 2}) ▸`}
-                </span>
+                {showAllSpecs ? "সংক্ষিপ্ত করুন" : `আরো (${totalAttrs - 2})`}
               </button>
             </div>
           )}
         </div>
 
-        <p className="text-xs sm:text-sm text-gray-300 leading-relaxed font-normal mb-4">
+        <p className="text-xs sm:text-[13px] text-gray-300 leading-relaxed mb-3">
           {productDescription}
         </p>
 
-        {/* স্পেসিফিকেশন কার্ড গ্রিড (প্রথমে ২টি মেইন, ক্লিকে বাকিগুলো) */}
-        <div className="grid grid-cols-2 gap-2 text-xs transition-all duration-300">
+        <div className="grid grid-cols-2 gap-2 text-xs">
           {visibleAttributes.map((attr, idx) => (
             <div
               key={`${attr.label}-${idx}`}
-              className="bg-[#1c1c1c] hover:bg-[#222224] border border-gray-800 hover:border-[#D4AF37]/40 rounded-xl p-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-1 transition"
+              className="bg-[#1b1d21] border border-[#2b2f36] rounded-lg p-2 flex flex-col sm:flex-row sm:items-center justify-between gap-1"
             >
               <span className="text-gray-400 font-medium text-[10px] sm:text-[11px] capitalize">
                 {attr.label}
               </span>
-              <span className="text-white font-bold text-[11px] sm:text-xs truncate">
+              <span className="text-gray-100 font-bold text-[11px] sm:text-xs truncate">
                 {attr.value}
               </span>
             </div>
           ))}
         </div>
 
-        {/* কাস্টমার ট্রাস্ট গ্যারান্টি মিনি স্ট্রিপ */}
-        <div className="mt-4 pt-3 border-t border-gray-800/80 grid grid-cols-3 gap-2 text-center">
-          <div className="bg-black/40 rounded-xl p-2 border border-gray-800/60 flex flex-col items-center justify-center gap-1">
-            <PackageCheck size={15} className="text-[#D4AF37]" />
-            <span className="text-[10px] font-bold text-gray-300">
+        <div className="mt-3 pt-2.5 border-t border-[#262a30] grid grid-cols-3 gap-2 text-center">
+          <div className="bg-[#191b1f] rounded-lg p-2 border border-[#282c34] flex flex-col items-center justify-center gap-1">
+            <PackageCheck size={14} className="text-[#d4a24c]" />
+            <span className="text-[10px] font-semibold text-gray-300">
               চেক করে রিসিভ
             </span>
           </div>
-          <div className="bg-black/40 rounded-xl p-2 border border-gray-800/60 flex flex-col items-center justify-center gap-1">
-            <ShieldCheck size={15} className="text-emerald-400" />
-            <span className="text-[10px] font-bold text-gray-300">
+          <div className="bg-[#191b1f] rounded-lg p-2 border border-[#282c34] flex flex-col items-center justify-center gap-1">
+            <ShieldCheck size={14} className="text-emerald-400" />
+            <span className="text-[10px] font-semibold text-gray-300">
               ১০০% অরিজিনাল
             </span>
           </div>
-          <div className="bg-black/40 rounded-xl p-2 border border-gray-800/60 flex flex-col items-center justify-center gap-1">
-            <HeartHandshake size={15} className="text-rose-400" />
-            <span className="text-[10px] font-bold text-gray-300">
+          <div className="bg-[#191b1f] rounded-lg p-2 border border-[#282c34] flex flex-col items-center justify-center gap-1">
+            <HeartHandshake size={14} className="text-rose-400" />
+            <span className="text-[10px] font-semibold text-gray-300">
               মানবিক উদ্যোগ
             </span>
           </div>

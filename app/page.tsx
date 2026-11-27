@@ -7,105 +7,95 @@ import TrustStrip from "@/components/landing/TrustStrip";
 import Footer from "@/components/landing/Footer";
 import ProductGrid from "@/components/landing/ProductGrid";
 import CustomerReviews from "@/components/reviews/CustomerReviews";
+import CheckoutForm from "@/components/product/CheckoutForm";
+import type { Product } from "@/lib/data";
 import { whatsappChatLink } from "@/lib/data";
-import { ArrowUp, ShieldAlert } from "lucide-react";
+import { ArrowUp, MessageCircle, X, CheckCircle2 } from "lucide-react";
+
+const DISTRICTS = [
+  "ঢাকা",
+  "হবিগঞ্জ",
+  "বরিশাল",
+  "চট্টগ্রাম",
+  "সিলেট",
+  "রাজশাহী",
+  "খুলনা",
+  "রংপুর",
+  "ময়মনসিংহ",
+  "কুমিল্লা",
+  "গাজীপুর",
+  "নারায়ণগঞ্জ",
+];
+
+function getProductInfo(product: Product) {
+  const p = product as Record<string, unknown>;
+  const name = String(
+    p["Product Name"] || p.productName || p.name || "Exclusive Gift",
+  );
+  const regularPrice = Number(p["Regular Price"] || p.regularPrice || 999);
+  const offerPrice = Number(
+    p["Offer Price"] || p.offerPrice || p.basePrice || 799,
+  );
+
+  let image = "/parl.webp";
+  const rawImg = p["Image URL1"] || p.image_url_1 || p.imageUrl1;
+  if (Array.isArray(p.images) && p.images[0]) {
+    image = String(p.images[0]);
+  } else if (typeof rawImg === "string" && rawImg.trim()) {
+    image = /^https?:\/\//i.test(rawImg)
+      ? rawImg
+      : `/${rawImg.replace(/^\/+/, "")}`;
+  }
+
+  return { name, regularPrice, offerPrice, image };
+}
 
 export default function Home() {
   const [searchQuery, setSearchQuery] = useState("");
-  const [categories, setCategories] = useState<string[]>([
-    "ব্রেসলেট (Bracelet)",
-    "নেকলেস (Necklace)",
-    "স্মার্ট ওয়াচ (Smart Watch)",
-    "গিফট বক্স (Gift Box)",
-  ]);
-
-  // ইউআই ও নেভিগেশন স্টেট
-  const [showExitToast, setShowExitToast] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState("");
   const [showScrollTop, setShowScrollTop] = useState(false);
-  const exitWarnedRef = useRef(false);
+
+  // মূল পেজে সরাসরি চেকআউট ফর্মের স্টেট
+  const [checkoutProduct, setCheckoutProduct] = useState<Product | null>(null);
+  const [fullName, setFullName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [selectedDistrict, setSelectedDistrict] = useState("ঢাকা");
+  const [address, setAddress] = useState("");
+  const [specialNote, setSpecialNote] = useState("");
+  const [agreed, setAgreed] = useState(true);
+  const [quantity, setQuantity] = useState(1);
+  const [submitting, setSubmitting] = useState(false);
+  const [orderSuccessMessage, setOrderSuccessMessage] = useState("");
+  const [orderErrorMessage, setOrderErrorMessage] = useState("");
+
+  const checkoutWrapperRef = useRef<HTMLDivElement | null>(null);
 
   const handleBackToHome = () => {
     setSearchQuery("");
+    setSelectedCategory("");
+    setCheckoutProduct(null);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  // ১. Supabase API থেকে লাইভ ক্যাটাগরি ফেচ করা
+  const handleDirectCheckout = (product: Product) => {
+    setCheckoutProduct(product);
+    setQuantity(1);
+    setOrderSuccessMessage("");
+    setOrderErrorMessage("");
+
+    setTimeout(() => {
+      const target =
+        document.getElementById("one-page-checkout") ||
+        checkoutWrapperRef.current;
+      target?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 80);
+  };
+
   useEffect(() => {
-    async function loadCategories() {
-      try {
-        const res = await fetch("/api/categories", { cache: "no-store" });
-        const data = await res.json();
-        if (
-          data.success &&
-          Array.isArray(data.categories) &&
-          data.categories.length > 0
-        ) {
-          setCategories(data.categories);
-        }
-      } catch {
-        console.warn("Categories fetch error, using default fallback.");
-      }
+    if (typeof window !== "undefined") {
+      sessionStorage.setItem("duo_visited_home", "true");
     }
-    loadCategories();
-  }, []);
 
-  // ২. হোমপেজ ভিজিট মার্ক করা এবং আগের স্ক্রোল পজিশনে ফিরিয়ে আনা
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    // মার্ক করে রাখা যে ইউজার হোমপেজ হয়ে এসেছে
-    sessionStorage.setItem("duo_visited_home", "true");
-
-    const savedScroll = sessionStorage.getItem("home_scroll_pos");
-    if (savedScroll) {
-      const targetY = parseInt(savedScroll, 10);
-      const timer = setTimeout(() => {
-        window.scrollTo({
-          top: targetY,
-          behavior: "smooth",
-        });
-        sessionStorage.removeItem("home_scroll_pos");
-      }, 120);
-      return () => clearTimeout(timer);
-    }
-  }, []);
-
-  // ৩. হোমপেজ এক্সিট গার্ড (একবার ব্যাক চাপলে আটকে রাখবে, ২য় বার চাপলে বের হবে)
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    // বর্তমান স্টেট গার্ড পুশ করা
-    window.history.pushState({ homeExitGuard: true }, "", window.location.href);
-
-    const handlePopState = () => {
-      if (!exitWarnedRef.current) {
-        exitWarnedRef.current = true;
-        setShowExitToast(true);
-        // ইউজারকে হোমপেজেই ধরে রাখতে পুনরায় স্টেট পুশ করা
-        window.history.pushState(
-          { homeExitGuard: true },
-          "",
-          window.location.href,
-        );
-
-        setTimeout(() => {
-          exitWarnedRef.current = false;
-          setShowExitToast(false);
-        }, 2500);
-      } else {
-        // ২.৫ সেকেন্ডের মধ্যে দ্বিতীয়বার ব্যাক চাপলে বের হতে দেওয়া
-        window.history.back();
-      }
-    };
-
-    window.addEventListener("popstate", handlePopState);
-    return () => {
-      window.removeEventListener("popstate", handlePopState);
-    };
-  }, []);
-
-  // ৪. নিচে স্ক্রোল করলে Scroll-to-Top বাটন দেখানো
-  useEffect(() => {
     const handleScroll = () => {
       setShowScrollTop(window.scrollY > 450);
     };
@@ -113,76 +103,197 @@ export default function Home() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
+  const productInfo = checkoutProduct ? getProductInfo(checkoutProduct) : null;
+  const subtotal = productInfo ? productInfo.offerPrice * quantity : 0;
+  const deliveryCharge =
+    selectedDistrict === "ঢাকা"
+      ? 70
+      : selectedDistrict === "হবিগঞ্জ"
+        ? 100
+        : 120;
+  const total = subtotal + deliveryCharge;
+
+  const handleOrderSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!checkoutProduct || !productInfo || !agreed) return;
+
+    setSubmitting(true);
+    setOrderErrorMessage("");
+    setOrderSuccessMessage("");
+
+    try {
+      const res = await fetch("/api/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          productId:
+            (checkoutProduct as Record<string, unknown>).id ||
+            (checkoutProduct as Record<string, unknown>).product_id ||
+            productInfo.name,
+          productName: productInfo.name,
+          unitPrice: productInfo.offerPrice,
+          quantity,
+          deliveryCharge,
+          totalAmount: total,
+          customerName: fullName.trim(),
+          phone: phone.trim(),
+          district: selectedDistrict,
+          address: address.trim(),
+          note: specialNote.trim(),
+          paymentMethod: "COD",
+        }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok && data?.success === false) {
+        throw new Error(data?.message || "অর্ডার সম্পন্ন করা যায়নি।");
+      }
+
+      const fbqFn = (
+        window as unknown as { fbq?: (...args: unknown[]) => void }
+      ).fbq;
+      if (typeof fbqFn === "function") {
+        fbqFn("track", "Purchase", {
+          value: total,
+          currency: "BDT",
+          content_name: productInfo.name,
+          num_items: quantity,
+        });
+      }
+
+      setOrderSuccessMessage(
+        `ধন্যবাদ ${fullName}! "${productInfo.name}" (${quantity} টি, মোট ৳${total}) এর ক্যাশ অন ডেলিভারি অর্ডারটি গ্রহণ করা হয়েছে।`,
+      );
+      setFullName("");
+      setPhone("");
+      setAddress("");
+      setSpecialNote("");
+      setQuantity(1);
+    } catch (err) {
+      setOrderErrorMessage(
+        err instanceof Error
+          ? err.message
+          : "অর্ডার পাঠাতে সমস্যা হয়েছে, আবার চেষ্টা করুন।",
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   return (
     <main className="min-h-screen bg-[#0a0a0a] text-white relative selection:bg-[#D4AF37] selection:text-black font-sans">
-      {/* ১. স্মার্ট ও প্রিমিয়াম হেডার */}
       <Header
         onHome={handleBackToHome}
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
         onCategorySelect={(cat) => {
-          setSearchQuery(cat);
+          setSelectedCategory(cat);
+          setSearchQuery("");
         }}
       />
 
-      {/* ২. মূল কন্টেন্ট ও প্রোডাক্ট সেকশন */}
       <div id="products-section">
-        <div>
-          {/* ৩:১ ওয়াইড সিনেম্যাটিক হিরো ব্যানার */}
-          <Hero onHome={handleBackToHome} />
+        <Hero onHome={handleBackToHome} />
 
-          {/* হিরো ব্যানারের ঠিক নিচে রিয়েল-টাইম রেটিং ও রিভিউ সেকশন */}
-          <section className="w-full bg-[#101010]/95 border-b border-[#D4AF37]/15 my-2">
-            <CustomerReviews />
-          </section>
+        <section className="w-full bg-[#101010]/95 border-b border-[#D4AF37]/15 my-2">
+          <CustomerReviews />
+        </section>
 
-          {/* প্রোডাক্ট গ্রিড, সার্চ ও ফিল্টারিং সহ */}
-          <ProductGrid searchQuery={searchQuery} />
-        </div>
+        <ProductGrid
+          searchQuery={searchQuery}
+          selectedCategory={selectedCategory}
+          onDirectCheckout={handleDirectCheckout}
+        />
       </div>
 
-      {/* ৩. ট্রাস্ট স্ট্রিপ */}
-      <TrustStrip />
-
-      {/* ৪. প্রিমিয়াম ব্ল্যাক অ্যান্ড গোল্ড ফুটার */}
-      <Footer />
-
-      {/* ডাবল-ব্যাক এক্সিট ওয়ার্নিং টোস্ট (প্রিমিয়াম গোল্ডেন পিল) */}
-      {showExitToast && (
-        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 w-[90%] max-w-sm animate-in fade-in slide-in-from-bottom-4 duration-200">
-          <div className="bg-[#181818]/95 backdrop-blur-md border border-[#D4AF37]/60 text-white px-4 py-3 rounded-2xl shadow-2xl flex items-center justify-center gap-2.5 text-xs font-bold">
-            <ShieldAlert
-              size={18}
-              className="text-[#D4AF37] shrink-0 animate-pulse"
-            />
-            <span>ওয়েবসাইট থেকে বের হতে চাইলে আবার ব্যাক চাপুন</span>
+      {/* মূল পেজেই সরাসরি চেকআউট ফর্ম সেকশন */}
+      {checkoutProduct && productInfo && (
+        <div
+          ref={checkoutWrapperRef}
+          className="max-w-3xl mx-auto px-4 py-6 space-y-3"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-extrabold text-[#E5BE67] uppercase tracking-wider">
+              সরাসরি কুইক অর্ডার
+            </span>
+            <button
+              type="button"
+              onClick={() => setCheckoutProduct(null)}
+              className="inline-flex items-center gap-1 text-xs text-gray-400 hover:text-white cursor-pointer"
+            >
+              <X size={14} />
+              <span>বন্ধ করুন</span>
+            </button>
           </div>
+
+          {orderSuccessMessage && (
+            <div className="rounded-xl bg-emerald-950/60 border border-emerald-500/40 p-3.5 text-xs sm:text-sm text-emerald-200 flex items-start gap-2">
+              <CheckCircle2
+                size={18}
+                className="text-emerald-400 shrink-0 mt-0.5"
+              />
+              <span>{orderSuccessMessage}</span>
+            </div>
+          )}
+
+          {orderErrorMessage && (
+            <div className="rounded-xl bg-rose-950/60 border border-rose-500/40 p-3.5 text-xs sm:text-sm text-rose-200">
+              {orderErrorMessage}
+            </div>
+          )}
+
+          <CheckoutForm
+            fullName={fullName}
+            setFullName={setFullName}
+            phone={phone}
+            setPhone={setPhone}
+            address={address}
+            setAddress={setAddress}
+            selectedDistrict={selectedDistrict}
+            handleDistrictChange={(e) => setSelectedDistrict(e.target.value)}
+            districts={DISTRICTS}
+            specialNote={specialNote}
+            setSpecialNote={setSpecialNote}
+            agreed={agreed}
+            setAgreed={setAgreed}
+            loading={submitting}
+            handleOrderSubmit={handleOrderSubmit}
+            productName={productInfo.name}
+            offerPrice={productInfo.offerPrice}
+            regularPrice={productInfo.regularPrice}
+            quantity={quantity}
+            setQuantity={setQuantity}
+            selectedImage={productInfo.image}
+            subtotal={subtotal}
+            deliveryCharge={deliveryCharge}
+            total={total}
+          />
         </div>
       )}
 
-      {/* ফ্লোটিং অ্যাকশন বাটনসমূহ (Scroll Top + WhatsApp) */}
-      <div className="fixed bottom-6 right-6 z-50 flex flex-col items-center gap-3">
+      <TrustStrip />
+      <Footer />
+
+      <div className="fixed bottom-6 right-6 z-50 flex flex-col items-center gap-2.5">
         {showScrollTop && (
           <button
             type="button"
             onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-            className="w-10 h-10 bg-[#1a1a1a]/90 hover:bg-[#D4AF37] text-[#D4AF37] hover:text-black border border-[#D4AF37]/40 rounded-full flex items-center justify-center shadow-xl transition-all hover:scale-110 cursor-pointer"
-            title="উপরে যান"
+            aria-label="উপরে যান"
+            className="w-10 h-10 bg-[#181818] hover:bg-[#D4AF37] text-[#E5BE67] hover:text-black border border-[#D4AF37]/40 rounded-full flex items-center justify-center shadow-lg transition-colors cursor-pointer"
           >
-            <ArrowUp size={18} />
+            <ArrowUp size={17} />
           </button>
         )}
 
         <a
-          href={whatsappChatLink}
+          href={whatsappChatLink || "https://wa.me/8801777156691"}
           target="_blank"
           rel="noopener noreferrer"
-          className="w-12 h-12 bg-green-500 hover:bg-green-600 text-white rounded-full flex items-center justify-center shadow-2xl transition-transform hover:scale-110 cursor-pointer"
-          title="WhatsApp Chat"
+          aria-label="WhatsApp-এ যোগাযোগ করুন"
+          className="w-12 h-12 bg-[#D4AF37] hover:bg-[#e2be69] text-black rounded-full flex items-center justify-center shadow-lg transition-transform hover:scale-105"
         >
-          <svg className="w-6 h-6 fill-current" viewBox="0 0 24 24">
-            <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z" />
-          </svg>
+          <MessageCircle size={22} />
         </a>
       </div>
     </main>

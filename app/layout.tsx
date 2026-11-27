@@ -10,7 +10,8 @@ import Script from "next/script";
 const hindSiliguri = Hind_Siliguri({
   variable: "--font-hind-siliguri",
   subsets: ["bengali", "latin"],
-  weight: ["300", "400", "500", "600", "700"],
+  weight: ["400", "500", "600", "700"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -40,6 +41,19 @@ export default function RootLayout({
     <ClerkProvider>
       <html lang="bn">
         <head>
+          <link
+            rel="preconnect"
+            href="https://connect.facebook.net"
+            crossOrigin="anonymous"
+          />
+          {GA_MEASUREMENT_ID && (
+            <link
+              rel="preconnect"
+              href="https://www.googletagmanager.com"
+              crossOrigin="anonymous"
+            />
+          )}
+
           {/* Facebook Domain Verification */}
           {FACEBOOK_DOMAIN_VERIFICATION && (
             <meta
@@ -78,16 +92,16 @@ export default function RootLayout({
             />
           )}
 
-          {/* Google Analytics 4 (GA4) Integration (যদি এনভায়রনমেন্ট ভ্যারিয়েবলে থাকে) */}
+          {/* Google Analytics 4 (GA4) Integration */}
           {GA_MEASUREMENT_ID && (
             <>
               <Script
-                strategy="afterInteractive"
+                strategy="lazyOnload"
                 src={`https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`}
               />
               <Script
                 id="google-analytics"
-                strategy="afterInteractive"
+                strategy="lazyOnload"
                 dangerouslySetInnerHTML={{
                   __html: `
                     window.dataLayer = window.dataLayer || [];
@@ -105,7 +119,7 @@ export default function RootLayout({
           {/* Marketing Attribution Capture (UTM, fbclid, gclid সংরক্ষণ করার স্ক্রিপ্ট) */}
           <Script
             id="marketing-attribution"
-            strategy="afterInteractive"
+            strategy="lazyOnload"
             dangerouslySetInnerHTML={{
               __html: `
                 (function() {
